@@ -1,0 +1,16 @@
+{
+  "name": "vertex-engine",
+  "version": "0.1.0",
+  "description": "A vector-native, agent-first game engine. Everything is SVG paths and JSON.",
+  "type": "module",
+  "main": "src/index.js",
+  "exports": { ".": "./src/index.js" },
+  "files": ["src"],
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "play:agent": "node examples/drift/agent-play.js",
+    "serve": "npx --yes serve ."
+  },
+  "keywords": ["game-engine", "vector", "svg", "agents", "llm", "canvas", "2d"],
+  "license": "MIT"
+}

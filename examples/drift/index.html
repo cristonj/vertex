@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Drift — Vertex</title>
+  <style>
+    html, body { margin: 0; height: 100%; background: #0b0d12; color: #c8ccd4; font: 14px monospace; }
+    body { display: grid; place-items: center; }
+    canvas { width: min(100vw, 133vh); aspect-ratio: 4 / 3; max-height: 100vh; }
+    p { position: fixed; bottom: 8px; margin: 0; opacity: .6; }
+  </style>
+</head>
+<body>
+  <canvas id="c" width="1600" height="1200"></canvas>
+  <p>←/→ turn · ↑ thrust · space fire</p>
+  <script type="module">
+    import { CanvasRenderer, bindKeys } from '../../src/index.js';
+    import { createDrift } from './drift.js';
+    const game = createDrift({ seed: Date.now() });
+    bindKeys(game, { ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'thrust', ' ': 'fire' });
+    game.run(new CanvasRenderer(document.getElementById('c')));
+  </script>
+</body>
+</html>
