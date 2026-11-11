@@ -1,16 +1,20 @@
 {
   "name": "vertex-engine",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "A vector-native, agent-first game engine. Everything is SVG paths and JSON.",
   "type": "module",
   "main": "src/index.js",
-  "exports": { ".": "./src/index.js" },
-  "files": ["src"],
+  "bin": { "vertex": "bin/vertex.js" },
+  "exports": { ".": "./src/index.js", "./mcp": "./mcp/server.js" },
+  "files": ["src", "bin", "mcp", "schema"],
   "scripts": {
-    "test": "node --test test/*.test.js",
+    "test": "node --test",
     "play:agent": "node examples/drift/agent-play.js",
+    "replay": "node bin/vertex.js play examples/drift/drift-run.json",
+    "mcp": "node bin/vertex.js mcp",
     "serve": "npx --yes serve ."
   },
-  "keywords": ["game-engine", "vector", "svg", "agents", "llm", "canvas", "2d"],
+  "engines": { "node": ">=18.3" },
+  "keywords": ["game-engine", "vector", "svg", "agents", "llm", "mcp", "canvas", "png", "replay", "deterministic", "2d"],
   "license": "MIT"
 }

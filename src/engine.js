@@ -15,6 +15,7 @@ export class Game {
     this.pressed = new Set();    // actions pressed this step (edge-triggered)
     this.events = [];            // events emitted this step: { type, ...payload }
     this._seed = seed >>> 0 || 1;
+    this._initialSeed = this._seed; // recordings remember this, so replays rebuild the same game
   }
 
   /** Deterministic PRNG (xorshift32) so headless replays match exactly. */

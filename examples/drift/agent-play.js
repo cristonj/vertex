@@ -1,26 +1,31 @@
-// Headless play: how an agent drives a Vertex game. Run: node examples/drift/agent-play.js
-// Observes JSON snapshots, chooses actions, and writes the final frame as an SVG.
+// Headless agent play — and proof that time is data.
+// The policy plays Drift; the whole run is recorded as a tiny JSON replay, which is then
+// replayed on a fresh instance and verified to reproduce the exact same final frame.
+// Run: node examples/drift/agent-play.js
 import { writeFileSync } from 'node:fs';
-import { createDrift } from './drift.js';
+import { createGame } from './drift.js';
+import policy from './policy.js';
+import { Recorder, applyRecording, verifyReplay, digest } from '../../src/index.js';
 
-const game = createDrift({ seed: 42 });
-game.press('fire');
-
-for (let t = 0; t < 600; t++) {
-  const snap = game.snapshot();
-  const ship = snap.entities.find((e) => e.id === 'ship');
-  const rocks = snap.entities.filter((e) => e.tags.includes('rock'));
-  if (ship && rocks.length) {
-    // naive policy: rotate toward nearest rock and keep firing
-    const r = rocks.reduce((a, b) => (Math.hypot(a.x - ship.x, a.y - ship.y) < Math.hypot(b.x - ship.x, b.y - ship.y) ? a : b));
-    const want = Math.atan2(r.y - ship.y, r.x - ship.x);
-    const diff = Math.atan2(Math.sin(want - ship.rot), Math.cos(want - ship.rot));
-    game.release('left'); game.release('right');
-    if (diff < -0.05) game.press('left'); else if (diff > 0.05) game.press('right');
-  }
-  for (const ev of game.step()) if (ev.type === 'gameover') t = Infinity;
+const game = createGame({ seed: 42 });
+const rec = new Recorder(game);
+for (let i = 0; i < 600; i++) {
+  policy(game);
+  if (game.step(1).some((e) => e.type === 'gameover')) break;
 }
 
-const out = new URL('./last-frame.svg', import.meta.url);
-writeFileSync(out, game.toSVG());
-console.log(game.world.state.hud, `| frame ${game.world.frame} | wrote ${out.pathname}`);
+const svg = game.toSVG();
+writeFileSync(new URL('./last-frame.svg', import.meta.url), svg);
+
+const doc = rec.toJSON({ scene: 'examples/drift/drift.js' });
+writeFileSync(new URL('./drift-run.json', import.meta.url), JSON.stringify(doc));
+
+// Prove the claim: replay the recording on a fresh game and compare frames.
+const replayed = createGame({ seed: doc.seed, fps: doc.fps });
+applyRecording(replayed, doc);
+verifyReplay(replayed, doc);
+
+console.log(
+  `${game.world.state.hud} | frames ${doc.steps} | replay exact (digest ${digest(game)})` +
+  ` | svg ${svg.length}B | input log ${JSON.stringify(doc.inputs).length}B`,
+);

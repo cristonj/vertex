@@ -1,4 +1,5 @@
 import { parsePath, flatten, bounds } from './path.js';
+import { assertValidScene } from './validate.js';
 
 /**
  * A World is plain data: shapes (vector art) + entities (instances) + state.
@@ -9,6 +10,7 @@ import { parsePath, flatten, bounds } from './path.js';
  */
 export class World {
   constructor(doc = {}) {
+    assertValidScene(doc);
     this.width = doc.width ?? 800;
     this.height = doc.height ?? 600;
     this.background = doc.background ?? '#000';
@@ -22,11 +24,15 @@ export class World {
     for (const e of doc.entities ?? []) this.spawn(e);
   }
 
-  /** Register a vector shape. Geometry is parsed once and cached. */
+  /** Register a vector shape. Geometry is parsed once and cached (per part and combined). */
   defineShape(name, shape) {
     const parts = shape.parts ?? [shape];
-    const compiled = parts.map((p) => ({ ...p, cmds: parsePath(p.d) }));
-    const polys = compiled.flatMap((p) => flatten(p.cmds));
+    const compiled = parts.map((p) => {
+      const cmds = parsePath(p.d);
+      const polys = flatten(cmds);
+      return { ...p, cmds, polys };
+    });
+    const polys = compiled.flatMap((p) => p.polys);
     this.shapes[name] = { src: shape, parts: compiled, polys, bounds: bounds(polys) };
     return this.shapes[name];
   }

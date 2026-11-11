@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { parsePath, flatten, bounds, World, Game, systems } from '../src/index.js';
-import { createDrift } from '../examples/drift/drift.js';
+import { createGame } from '../examples/drift/drift.js';
 
 test('parsePath handles relative, implicit lineto, H/V, Z', () => {
   const c = parsePath('m10 10 5 0 v5 h-5 z');
@@ -35,12 +35,12 @@ test('motion + collide emit hit events', () => {
 });
 
 test('headless runs are deterministic for a seed', () => {
-  const run = () => { const g = createDrift({ seed: 7 }); g.press('fire'); g.press('left'); g.step(300); return g.toSVG(); };
+  const run = () => { const g = createGame({ seed: 7 }); g.press('fire'); g.press('left'); g.step(300); return g.toSVG(); };
   assert.equal(run(), run());
 });
 
 test('toSVG output is small', () => {
-  const g = createDrift({ seed: 1 }); g.step(10);
+  const g = createGame({ seed: 1 }); g.step(10);
   const svg = g.toSVG();
   assert.match(svg, /^<svg/);
   assert.ok(svg.length < 4000, `frame was ${svg.length} bytes`);

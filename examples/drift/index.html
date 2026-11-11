@@ -16,8 +16,8 @@
   <p>←/→ turn · ↑ thrust · space fire</p>
   <script type="module">
     import { CanvasRenderer, bindKeys } from '../../src/index.js';
-    import { createDrift } from './drift.js';
-    const game = createDrift({ seed: Date.now() });
+    import { createGame } from './drift.js';
+    const game = createGame({ seed: Date.now() });
     bindKeys(game, { ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'thrust', ' ': 'fire' });
     game.run(new CanvasRenderer(document.getElementById('c')));
   </script>

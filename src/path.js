@@ -89,7 +89,7 @@ export function flatten(cmds, steps = 8) {
           ]);
         }
         x = c[5]; y = c[6]; break;
-      case 'Z': if (cur && cur.length) { x = cur[0][0]; y = cur[0][1]; } break;
+      case 'Z': if (cur && cur.length) { x = cur[0][0]; y = cur[0][1]; cur.push([x, y]); } break;
     }
   }
   return polys;

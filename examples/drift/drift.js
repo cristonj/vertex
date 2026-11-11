@@ -15,7 +15,7 @@ export const scene = {
   state: { score: 0, lives: 3, hud: '' },
 };
 
-export function createDrift(opts) {
+export function createGame(opts) {
   const game = new Game(scene, opts);
   const w = game.world;
 

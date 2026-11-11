@@ -112,7 +112,7 @@ them, and whole genres explored by search.
 | Stage | Theme | What it adds |
 |---|---|---|
 | **v0.1** (shipped) | Proof | Path parser, JSON world, deterministic loop, canvas and SVG renderers, built-in behaviours, the Drift demo, a headless agent player |
-| **v0.2** | Agent loop | CLI runner, MCP server (load, step, observe, edit as tools), JSON Schema for scenes, input recording and replay, optional PNG output |
+| **v0.2** (shipped) | Agent loop | CLI runner (`vertex run/play/schema/mcp`), MCP server (load, step, observe, view, screenshot, edit, reset), JSON Schema + construction-time validation, input recording and exact replay, pure-JS PNG output |
 | **v0.3** | Richer vectors | True arcs, exact outline collision, gradients and clipping, path-morph and skeletal animation, vector text, procedural shapes |
 | **v0.4** | Scale | GPU renderer, spatial broadphase, camera and layers, sound as synth data |
 | **v0.5** | Time | Rewind and scrub, branching timelines, input-sync multiplayer, shareable replay files |
@@ -136,6 +136,9 @@ Stated plainly, because the ambition depends on them:
 
 ## Where we are today
 
-v0.1 exists and is tested: the parser (arcs are approximated as straight lines), the JSON world,
-the deterministic loop, both renderers, circle-based collision, action input, and one example game
-with a scripted headless player. Everything else in this document is direction, not shipped code.
+v0.2 exists and is tested (28 tests, zero dependencies): the parser (arcs are approximated as
+straight lines), the JSON world with schema validation, the deterministic loop, SVG and canvas
+renderers plus a pure-JS PNG rasterizer, circle-based collision, action input, input recordings
+that replay byte-identically, a CLI (`run`, `play`, `schema`, `mcp`), and an MCP server so any
+MCP client can drive a game. One example game ships with a policy module, a recorded run, and a
+verified replay. Everything else in this document is direction, not shipped code.

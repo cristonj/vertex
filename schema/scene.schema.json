@@ -1,0 +1,70 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://raw.githubusercontent.com/cristonj/vertex/master/schema/scene.schema.json",
+  "title": "Vertex scene document",
+  "description": "A complete Vertex game world: vector shapes (SVG path data), entities (instances of shapes), and game state. This file is the formal description of the format and doubles as documentation for code generators: a whole game is this object plus systems.",
+  "type": "object",
+  "properties": {
+    "width": { "type": "number", "description": "World width in world units.", "default": 800 },
+    "height": { "type": "number", "description": "World height in world units.", "default": 600 },
+    "background": { "type": "string", "description": "CSS color painted behind everything.", "default": "#000" },
+    "shapes": {
+      "type": "object",
+      "description": "Named vector shapes. Geometry is SVG path data centered on (0,0), facing +x at rotation 0. Keep paths small; prefer M/L/Q/C/Z.",
+      "additionalProperties": { "$ref": "#/definitions/shape" }
+    },
+    "entities": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/entity" },
+      "description": "Instances of shapes. Plain data: every field is readable and writable by humans, systems, and agents."
+    },
+    "state": {
+      "type": "object",
+      "description": "Game-level values (score, lives, ...). state.hud, if present, is rendered as text by both renderers."
+    }
+  },
+  "definitions": {
+    "shape": {
+      "type": "object",
+      "description": "One path with style, or a composite of parts.",
+      "properties": {
+        "d": { "type": "string", "description": "SVG path data. Supports M/L/H/V/C/S/Q/T/Z, absolute and relative. Arcs (A) are approximated as lines." },
+        "fill": { "type": "string", "description": "CSS color, or 'none'." },
+        "stroke": { "type": "string", "description": "CSS color, or 'none'." },
+        "width": { "type": "number", "description": "Stroke width." },
+        "parts": {
+          "type": "array",
+          "description": "Multiple paths drawn together as one shape, in order.",
+          "items": { "$ref": "#/definitions/shape" }
+        }
+      },
+      "anyOf": [ { "required": ["d"] }, { "required": ["parts"] } ]
+    },
+    "entity": {
+      "type": "object",
+      "description": "An instance of a shape in the world.",
+      "properties": {
+        "id": { "type": "string", "description": "Unique id. Auto-assigned (e1, e2, ...) if omitted." },
+        "shape": { "type": "string", "description": "Name of a shape defined in shapes." },
+        "x": { "type": "number" },
+        "y": { "type": "number" },
+        "rot": { "type": "number", "description": "Rotation in radians; 0 faces +x." },
+        "scale": { "type": "number" },
+        "vx": { "type": "number", "description": "Velocity, world units per second." },
+        "vy": { "type": "number" },
+        "vr": { "type": "number", "description": "Angular velocity, radians per second." },
+        "drag": { "type": "number", "description": "Velocity damping fraction per second, 0..1 (used by the motion system)." },
+        "tags": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "System selectors: 'wrap' wraps at edges, other tags pair up in collide()."
+        },
+        "data": {
+          "type": "object",
+          "description": "Free-form per-entity values. data.ttl (seconds) despawns the entity via the lifetime system."
+        },
+        "hidden": { "type": "boolean", "description": "Skipped by renderers." }
+      }
+    }
+  }
+}
