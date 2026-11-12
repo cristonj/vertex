@@ -180,7 +180,8 @@ test('the Starfall hero starts a human player instead of an autopilot',()=>{
 
 test('gallery icons and measured source sizes stay current',()=>{
   const paths=['index.html','README.md',...games.map(g=>`examples/${g.id}/icon.svg`)];
-  const before=paths.map(p=>readFileSync(new URL('../'+p,import.meta.url),'utf8'));
+  const read=p=>readFileSync(new URL('../'+p,import.meta.url),'utf8').replace(/\r\n/g,'\n');
+  const before=paths.map(read);
   buildGallery();
-  for(let i=0;i<paths.length;i++)assert.equal(readFileSync(new URL('../'+paths[i],import.meta.url),'utf8'),before[i],`rebuild ${paths[i]}`);
+  for(let i=0;i<paths.length;i++)assert.equal(read(paths[i]),before[i],`rebuild ${paths[i]}`);
 });

@@ -27,9 +27,9 @@ export function buildGallery() {
     cards.push(`      <a class="card" href="${href}"><img src="examples/${g.id}/icon.svg" alt="" width="56" height="56" loading="lazy"><b>${g.title}</b><span>${g.description}</span><small>${g.controls}</small><span class="meta" title="${raw.toLocaleString('en-US')} source bytes; ${gz.toLocaleString('en-US')} gzip bytes">${size(raw)} source · ${size(gz)} gzip</span></a>`);
     rows.push(`| [${g.title}](${g.source}) | ${g.description} | ${size(raw)} | ${size(gz)} |`);
   }
-  const p='index.html';let html=readFileSync(p,'utf8');
+  const p='index.html';let html=readFileSync(p,'utf8').replace(/\r\n/g,'\n');
   html=html.replace(/<!-- GAMES:START -->[\s\S]*?<!-- GAMES:END -->/,`<!-- GAMES:START -->\n    <div class="games">\n${cards.join('\n')}\n    </div>\n    <!-- GAMES:END -->`);writeFileSync(p,html);
-  const rp='README.md';let md=readFileSync(rp,'utf8');
+  const rp='README.md';let md=readFileSync(rp,'utf8').replace(/\r\n/g,'\n');
   md=md.replace(/<!-- GAMES:START -->[\s\S]*?<!-- GAMES:END -->/,`<!-- GAMES:START -->\n| Game | Gameplay | Source | Gzip |\n|---|---|---:|---:|\n${rows.join('\n')}\n\nSizes measure each complete game source with LF line endings. Gzip uses level 9; the shared engine, player and optional icon are excluded. Rebuild with \`node tools/gallery.mjs\`.\n<!-- GAMES:END -->`);writeFileSync(rp,md);
 }
 if(process.argv[1]?.replace(/\\/g,'/').endsWith('/gallery.mjs')) buildGallery();
