@@ -10,7 +10,7 @@ import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import readline from 'node:readline';
 import { createFrom, loadSceneModule } from '../src/load.js';
-import { toPNG } from '../src/png.js';
+import { toPNG } from '../src/node.js';
 
 const TOOLS = [
   {

@@ -2,11 +2,21 @@
 // replays are exact, a few hundred bytes, and renderable at any resolution.
 // Format: { vertex: 1, scene, seed, fps, steps, digest, inputs: [[frame, "p"|"r", action], ...] }
 // `inputs` is an ordered event list — only frames where held actions changed appear.
-import { createHash } from 'node:crypto';
+/** 64-bit non-cryptographic string hash (two 32-bit FNV-1a lanes), as 16 hex chars. */
+export function hash64(str) {
+  let h1 = 0x811c9dc5, h2 = 0x01000193 ^ str.length;
+  for (let i = 0; i < str.length; i++) {
+    const c = str.charCodeAt(i);
+    h1 = Math.imul(h1 ^ c, 16777619);
+    h2 = Math.imul(h2 ^ c, 2246822519) ^ (h1 >>> 13);
+  }
+  return (h1 >>> 0).toString(16).padStart(8, '0') + (h2 >>> 0).toString(16).padStart(8, '0');
+}
 
-/** Short digest of the current frame. Same digest after a replay = the run was identical. */
+/** Short digest of the current frame. Same digest after a replay = the run was identical.
+ *  Pure JS, so replays verify identically in Node and in the browser. */
 export function digest(game) {
-  return createHash('sha256').update(game.toSVG()).digest('hex').slice(0, 16);
+  return hash64(game.toSVG());
 }
 
 /**

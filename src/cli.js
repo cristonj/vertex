@@ -9,7 +9,7 @@ import { writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { resolve, dirname, relative } from 'node:path';
 import { loadSceneModule, createFrom } from './load.js';
 import { Recorder, applyRecording, verifyReplay, digest } from './replay.js';
-import { toPNG } from './png.js';
+import { toPNG } from './node.js';
 import { runMCPServer } from '../mcp/server.js';
 
 const OPTIONS = {

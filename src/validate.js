@@ -5,7 +5,7 @@
 const isNum = (v) => typeof v === 'number' && Number.isFinite(v);
 const isStr = (v) => typeof v === 'string';
 
-const ENTITY_NUMS = ['x', 'y', 'rot', 'scale', 'vx', 'vy', 'vr', 'drag'];
+const ENTITY_NUMS = ['x', 'y', 'rot', 'scale', 'vx', 'vy', 'vr', 'drag', 'layer', 'parallax', 'width'];
 
 export function checkScene(doc) {
   const errors = [];
@@ -17,6 +17,16 @@ export function checkScene(doc) {
   if (doc.width !== undefined && !isNum(doc.width)) err('width', 'must be a number');
   if (doc.height !== undefined && !isNum(doc.height)) err('height', 'must be a number');
   if (doc.background !== undefined && !isStr(doc.background)) err('background', 'must be a CSS color string');
+
+  if (doc.camera !== undefined) {
+    if (!doc.camera || typeof doc.camera !== 'object') err('camera', 'must be an object { x, y, zoom?, rot? }');
+    else for (const k of ['x', 'y', 'zoom', 'rot']) {
+      if (doc.camera[k] !== undefined && !isNum(doc.camera[k])) err(`camera.${k}`, 'must be a number');
+    }
+  }
+  if (doc.sounds !== undefined && (typeof doc.sounds !== 'object' || doc.sounds === null || Array.isArray(doc.sounds))) {
+    err('sounds', 'must be an object mapping name -> sound params');
+  }
 
   const names = new Set();
   if (doc.shapes !== undefined) {

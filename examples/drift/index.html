@@ -15,11 +15,14 @@
   <canvas id="c" width="1600" height="1200"></canvas>
   <p>←/→ turn · ↑ thrust · space fire</p>
   <script type="module">
-    import { CanvasRenderer, bindKeys } from '../../src/index.js';
+    import { bindKeys, attachAudio } from '../../src/index.js';
+    import { autoRenderer } from '../../src/webgl.js';
     import { createGame } from './drift.js';
     const game = createGame({ seed: Date.now() });
     bindKeys(game, { ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'thrust', ' ': 'fire' });
-    game.run(new CanvasRenderer(document.getElementById('c')));
+    attachAudio(game);
+    const renderer = await autoRenderer(document.getElementById('c'));  // WebGL2, else Canvas2D
+    game.run(renderer);
   </script>
 </body>
 </html>

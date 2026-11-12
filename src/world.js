@@ -17,9 +17,12 @@ export class World {
     this.width = doc.width ?? 800;
     this.height = doc.height ?? 600;
     this.background = doc.background ?? '#000';
+    if (doc.camera) this.camera = { zoom: 1, rot: 0, ...doc.camera };
     this.shapes = {};
     this.entities = [];
     this.state = structuredClone(doc.state ?? {});
+    this.sounds = structuredClone(doc.sounds ?? {});
+    this._byId = new Map();
     this.time = 0;
     this.frame = 0;
     this._nextId = 1;
@@ -36,7 +39,8 @@ export class World {
       return { ...p, cmds, polys };
     });
     const polys = compiled.flatMap((p) => p.polys);
-    this.shapes[name] = { src: shape, parts: compiled, polys, bounds: bounds(polys) };
+    const pad = Math.max(0, ...compiled.map((p) => (p.stroke && p.stroke !== 'none' ? (p.width ?? 1) / 2 : 0)));
+    this.shapes[name] = { src: shape, parts: compiled, polys, bounds: bounds(polys), pad };
     return this.shapes[name];
   }
 
@@ -49,16 +53,26 @@ export class World {
       data: structuredClone(e.data ?? {}),
     };
     this.entities.push(ent);
+    this._byId.set(ent.id, ent);
     return ent;
   }
 
   despawn(entOrId) {
     const id = typeof entOrId === 'string' ? entOrId : entOrId.id;
-    const i = this.entities.findIndex((e) => e.id === id);
+    const known = this._byId.get(id);
+    const i = known ? this.entities.lastIndexOf(known) : this.entities.findIndex((e) => e.id === id);
     if (i >= 0) this.entities.splice(i, 1);
+    this._byId.delete(id);
   }
 
-  get(id) { return this.entities.find((e) => e.id === id); }
+  /** O(1) lookup by id (falls back to a scan for entities pushed without spawn()). */
+  get(id) {
+    const e = this._byId.get(id);
+    if (e) return e;
+    const found = this.entities.find((x) => x.id === id);
+    if (found) this._byId.set(id, found);
+    return found;
+  }
   query(tag) { return this.entities.filter((e) => e.tags.includes(tag)); }
 
   /** World-space bounding radius of an entity (inline geometry or registered shape). */
@@ -68,6 +82,8 @@ export class World {
   toJSON() {
     return {
       width: this.width, height: this.height, background: this.background,
+      ...(this.camera ? { camera: { ...this.camera } } : {}),
+      ...(Object.keys(this.sounds).length ? { sounds: this.sounds } : {}),
       shapes: Object.fromEntries(Object.entries(this.shapes).map(([k, v]) => [k, v.src])),
       entities: this.entities.map((e) => ({ ...e })),
       state: this.state,
@@ -88,7 +104,7 @@ export function entityGeom(world, e) {
     if (!g || g.d !== e.d) {
       const cmds = parsePath(e.d);
       const polys = flatten(cmds);
-      g = { d: e.d, cmds, polys, bounds: bounds(polys) };
+      g = { d: e.d, cmds, polys, bounds: bounds(polys), pad: (e.width ?? 1) / 2 };
       geomCache.set(e, g);
     }
     return g;

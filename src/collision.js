@@ -2,6 +2,7 @@
 // Broadphase is the cheap cached bounding radius; narrowphase tests actual transformed
 // outlines (segment intersections + containment). Zero dependencies, plain polygons.
 import { entityGeom } from './world.js';
+import { forEachPair } from './spatial.js';
 
 /** Transform local shape points to world space for an entity. */
 export function localToWorld(e) {
@@ -74,14 +75,34 @@ export function pointInPoly([px, py], poly) {
   return inside;
 }
 
+/** World-space polys + their AABBs for an entity, optionally memoized for one pass. */
+function worldPolys(world, e, cache) {
+  let rec = cache?.get(e);
+  if (rec) return rec;
+  const polys = entityPolys(world, e);
+  const boxes = polys.map((p) => {
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    for (const [x, y] of p) { if (x < x0) x0 = x; if (y < y0) y0 = y; if (x > x1) x1 = x; if (y > y1) y1 = y; }
+    return [x0, y0, x1, y1];
+  });
+  rec = { polys, boxes };
+  cache?.set(e, rec);
+  return rec;
+}
+
 /** Full outline overlap test (touching edges or containment, either direction). */
-export function outlinesOverlap(world, a, b) {
-  const pa = entityPolys(world, a), pb = entityPolys(world, b);
-  if (!pa.length || !pb.length) return false;
-  for (const A of pa) for (const B of pb) if (outlinesTouch(A, B)) return true;
-  for (const A of pa) for (const B of pb) {
-    if (A.length >= 3 && pointInPoly(B[0], A)) return true;
-    if (B.length >= 3 && pointInPoly(A[0], B)) return true;
+export function outlinesOverlap(world, a, b, cache) {
+  const A = worldPolys(world, a, cache), B = worldPolys(world, b, cache);
+  if (!A.polys.length || !B.polys.length) return false;
+  for (let i = 0; i < A.polys.length; i++) {
+    const ba = A.boxes[i], pa = A.polys[i];
+    for (let j = 0; j < B.polys.length; j++) {
+      const bb = B.boxes[j], pb = B.polys[j];
+      if (ba[2] < bb[0] || bb[2] < ba[0] || ba[3] < bb[1] || bb[3] < ba[1]) continue; // AABB reject
+      if (outlinesTouch(pa, pb)) return true;
+      if (pa.length >= 3 && pointInPoly(pb[0], pa)) return true;
+      if (pb.length >= 3 && pointInPoly(pa[0], pb)) return true;
+    }
   }
   return false;
 }
@@ -93,15 +114,11 @@ export function outlinesOverlap(world, a, b) {
  */
 export function collideOutline(pairs) {
   return (game) => {
-    const w = game.world;
+    const w = game.world, cache = new Map(); // world-space outlines, computed once per entity per step
     for (const [ta, tb] of pairs) {
-      for (const a of w.query(ta)) for (const b of w.query(tb)) {
-        if (a === b) continue;
-        const rr = w.radius(a) + w.radius(b);
-        const dx = a.x - b.x, dy = a.y - b.y;
-        if (dx * dx + dy * dy >= rr * rr) continue;
-        if (outlinesOverlap(w, a, b)) game.emit('hit', { a: a.id, b: b.id, tags: [ta, tb] });
-      }
+      forEachPair(w, ta, tb, (a, b) => {
+        if (outlinesOverlap(w, a, b, cache)) game.emit('hit', { a: a.id, b: b.id, tags: [ta, tb] });
+      });
     }
   };
 }

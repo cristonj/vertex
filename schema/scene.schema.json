@@ -18,6 +18,16 @@
       "items": { "$ref": "#/definitions/entity" },
       "description": "Instances of shapes. Plain data: every field is readable and writable by humans, systems, and agents."
     },
+    "camera": {
+      "type": "object",
+      "description": "World point shown at the screen center. Omit for an identity view (origin top-left).",
+      "properties": { "x": { "type": "number" }, "y": { "type": "number" }, "zoom": { "type": "number", "default": 1 }, "rot": { "type": "number", "default": 0 } }
+    },
+    "sounds": {
+      "type": "object",
+      "description": "Named sound effects as synth parameters (see src/audio.js): no audio files.",
+      "additionalProperties": { "$ref": "#/definitions/sound" }
+    },
     "state": {
       "type": "object",
       "description": "Game-level values (score, lives, ...). state.hud, if present, is rendered as text by both renderers."
@@ -43,6 +53,19 @@
         }
       },
       "anyOf": [ { "required": ["d"] }, { "required": ["parts"] } ]
+    },
+    "sound": {
+      "type": "object",
+      "description": "Parametric sound effect. Rendered deterministically to samples at load time.",
+      "properties": {
+        "wave": { "enum": ["square", "saw", "sine", "triangle", "noise"] },
+        "freq": { "type": "number", "description": "Start frequency, Hz." },
+        "slide": { "type": "number", "description": "Frequency change, Hz per second." },
+        "attack": { "type": "number" }, "sustain": { "type": "number" }, "decay": { "type": "number" },
+        "volume": { "type": "number" }, "vibrato": { "type": "number" }, "vibratoRate": { "type": "number" },
+        "duty": { "type": "number", "description": "Square wave duty cycle 0..1." },
+        "lowpass": { "type": "number", "description": "One-pole lowpass cutoff, Hz." }
+      }
     },
     "gradient": {
       "type": "object",
@@ -86,7 +109,10 @@
           "type": "object",
           "description": "Free-form per-entity values. data.ttl (seconds) despawns the entity via the lifetime system."
         },
-        "hidden": { "type": "boolean", "description": "Skipped by renderers." }
+        "hidden": { "type": "boolean", "description": "Skipped by renderers." },
+        "layer": { "type": "number", "description": "Draw order; lower draws first, stable within a layer. Default 0." },
+        "parallax": { "type": "number", "description": "Camera influence: 1 normal, 0 pinned to screen, 0.5 distant background." },
+        "fixed": { "type": "boolean", "description": "Screen-space (UI): ignores the camera." }
       }
     }
   }

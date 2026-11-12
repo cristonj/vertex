@@ -1,5 +1,6 @@
 import { World } from './world.js';
 import { toSVG } from './render.js';
+import { toPNG } from './png.js';
 
 /**
  * Game = World + systems + deterministic fixed-timestep loop.
@@ -28,6 +29,9 @@ export class Game {
 
   /** Add a system: (game, dt) => void. Runs in insertion order each step. */
   use(system) { this.systems.push(system); return this; }
+
+  /** Play a named sound from world.sounds (emits a "sound" event; attachAudio plays it). */
+  sound(name, payload = {}) { this.emit('sound', { name, ...payload }); }
 
   emit(type, payload = {}) { this.events.push({ type, frame: this.world.frame, ...payload }); }
 
@@ -61,6 +65,7 @@ export class Game {
   }
 
   toSVG(opts) { return toSVG(this.world, opts); }
+  toPNG(opts) { return toPNG(this.world, opts); }
 
   /** Browser loop: requestAnimationFrame + accumulator. Returns a stop function. */
   run(renderer) {

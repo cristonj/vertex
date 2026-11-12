@@ -1,10 +1,13 @@
-// Pure-JS vector rasterizer: world -> PNG. Zero dependencies (node:zlib only).
+// Pure-JS vector rasterizer: world -> PNG. Zero dependencies, runs in Node and browsers.
+// Compression: a pluggable deflate (Node's zlib is wired in by src/node.js); without it,
+// PNGs are written with stored (uncompressed) deflate blocks — valid, just larger.
 // Fills polygons (even-odd scanline) and strokes (thick quads + round joins) with flat color
 // or gradients, using the same coordinates as toSVG. Renders registered shapes, inline
 // entity geometry (e.d), gradient fills, and HUD text via the built-in vector stroke font.
-import { deflateSync } from 'node:zlib';
 import { flatten, parsePath } from './path.js';
 import { textPath } from './text.js';
+import { drawList, invert, apply, matScale } from './view.js';
+import { cullRadius } from './render.js';
 
 const NAMED = {
   black: '#000000', white: '#ffffff', red: '#ff0000', green: '#008000', blue: '#0000ff',
@@ -54,27 +57,20 @@ function ramp(stops, t) {
 export function toPNG(world, { width = world.width, height = world.height } = {}) {
   width = Math.max(1, Math.round(width));
   height = Math.max(1, Math.round(height));
-  const px = Buffer.alloc(width * height * 3);
+  const px = new Uint8Array(width * height * 3);
   const bg = parseColor(world.background) ?? [0, 0, 0];
   for (let i = 0; i < px.length; i += 3) { px[i] = bg[0]; px[i + 1] = bg[1]; px[i + 2] = bg[2]; }
 
   const sx = width / world.width, sy = height / world.height;
-  for (const e of world.entities) {
-    if (e.hidden) continue;
+  for (const [e, m] of drawList(world, cullRadius(world))) {
     const parts = e.d != null
       ? [{ cmds: parsePath(e.d), fill: e.fill, stroke: e.stroke, width: e.width }]
       : world.shapes[e.shape]?.parts;
     if (!parts) continue;
-    const cos = Math.cos(e.rot), sin = Math.sin(e.rot);
-    const T = (x, y) => [
-      (e.x + (x * cos - y * sin) * e.scale) * sx,
-      (e.y + (x * sin + y * cos) * e.scale) * sy,
-    ];
-    // pixel -> shape-local, for gradient evaluation
-    const inv = (pX, pY) => {
-      const dx = pX / sx - e.x, dy = pY / sy - e.y;
-      return [(dx * cos + dy * sin) / e.scale, (-dx * sin + dy * cos) / e.scale];
-    };
+    const T = (x, y) => { const [X, Y] = apply(m, x, y); return [X * sx, Y * sy]; };
+    const mi = invert(m);
+    const inv = (pX, pY) => apply(mi, pX / sx, pY / sy); // pixel -> shape-local, for gradients
+    const ms = matScale(m);
     const gradAt = (fill) => {
       if (fill.type === 'radial') return (pX, pY) => { const [lx, ly] = inv(pX, pY); return ramp(fill.stops, Math.hypot(lx - fill.cx, ly - fill.cy) / fill.r); };
       const vx = fill.x2 - fill.x1, vy = fill.y2 - fill.y1, v2 = vx * vx + vy * vy || 1;
@@ -89,7 +85,7 @@ export function toPNG(world, { width = world.width, height = world.height } = {}
       }
       const stroke = parseColor(part.stroke);
       if (stroke) {
-        const w = (part.width ?? 1) * e.scale * ((sx + sy) / 2);
+        const w = (part.width ?? 1) * ms * ((sx + sy) / 2);
         for (const poly of strokePolys(paths, w)) fillPolys(px, width, height, [poly], stroke);
       }
     }
@@ -195,30 +191,53 @@ function crc32(buf) {
   return (c ^ -1) >>> 0;
 }
 
-function chunk(type, data) {
-  const out = Buffer.alloc(12 + data.length);
-  out.writeUInt32BE(data.length, 0);
-  out.write(type, 4, 'ascii');
-  data.copy(out, 8);
-  out.writeUInt32BE(crc32(out.subarray(4, 8 + data.length)), 8 + data.length);
+let deflateImpl = storedDeflate;
+/** Plug in a real deflate (e.g. zlib.deflateSync). Called by src/node.js. */
+export function setDeflate(fn) { deflateImpl = fn; }
+
+/** zlib stream made of stored blocks: no compression, no dependencies, always valid. */
+function storedDeflate(data) {
+  const blocks = Math.max(1, Math.ceil(data.length / 65535));
+  const out = new Uint8Array(2 + data.length + blocks * 5 + 4);
+  out[0] = 0x78; out[1] = 0x01;
+  let o = 2, a = 1, b = 0;
+  for (let i = 0; i < blocks; i++) {
+    const start = i * 65535, len = Math.min(65535, data.length - start);
+    out[o++] = i === blocks - 1 ? 1 : 0;
+    out[o++] = len & 255; out[o++] = len >> 8; out[o++] = ~len & 255; out[o++] = (~len >> 8) & 255;
+    out.set(data.subarray(start, start + len), o); o += len;
+  }
+  for (let i = 0; i < data.length; i++) { a = (a + data[i]) % 65521; b = (b + a) % 65521; }
+  const adler = ((b << 16) | a) >>> 0;
+  out[o++] = adler >>> 24; out[o++] = (adler >>> 16) & 255; out[o++] = (adler >>> 8) & 255; out[o++] = adler & 255;
   return out;
 }
 
+const u32 = (out, v, o) => { out[o] = v >>> 24; out[o + 1] = (v >>> 16) & 255; out[o + 2] = (v >>> 8) & 255; out[o + 3] = v & 255; };
+
+function chunk(type, data) {
+  const out = new Uint8Array(12 + data.length);
+  u32(out, data.length, 0);
+  for (let i = 0; i < 4; i++) out[4 + i] = type.charCodeAt(i);
+  out.set(data, 8);
+  u32(out, crc32(out.subarray(4, 8 + data.length)), 8 + data.length);
+  return out;
+}
+
+/** Encode packed RGB bytes as a PNG. Returns a Uint8Array (a Buffer under Node). */
 export function encodePNG(rgb, width, height) {
-  const ihdr = Buffer.alloc(13);
-  ihdr.writeUInt32BE(width, 0);
-  ihdr.writeUInt32BE(height, 4);
+  const ihdr = new Uint8Array(13);
+  u32(ihdr, width, 0); u32(ihdr, height, 4);
   ihdr[8] = 8;  // bit depth
   ihdr[9] = 2;  // color type: truecolor RGB
   const stride = width * 3;
-  const raw = Buffer.alloc((stride + 1) * height);
-  for (let y = 0; y < height; y++) {
-    rgb.copy(raw, y * (stride + 1) + 1, y * stride, (y + 1) * stride);
-  }
-  return Buffer.concat([
-    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
-    chunk('IHDR', ihdr),
-    chunk('IDAT', deflateSync(raw, { level: 9 })),
-    chunk('IEND', Buffer.alloc(0)),
-  ]);
+  const raw = new Uint8Array((stride + 1) * height);
+  for (let y = 0; y < height; y++) raw.set(rgb.subarray(y * stride, (y + 1) * stride), y * (stride + 1) + 1);
+  const parts = [
+    new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    chunk('IHDR', ihdr), chunk('IDAT', deflateImpl(raw)), chunk('IEND', new Uint8Array(0)),
+  ];
+  const out = new Uint8Array(parts.reduce((n, p) => n + p.length, 0));
+  let o = 0; for (const p of parts) { out.set(p, o); o += p.length; }
+  return globalThis.Buffer ? globalThis.Buffer.from(out.buffer, out.byteOffset, out.length) : out;
 }

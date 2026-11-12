@@ -1,3 +1,4 @@
+// Browser-safe core (no Node built-ins). Node tooling: src/node.js.
 export { parsePath, flatten, bounds } from './path.js';
 export { World, entityGeom } from './world.js';
 export { Game } from './engine.js';
@@ -5,10 +6,15 @@ export { toSVG, CanvasRenderer } from './render.js';
 export * as systems from './systems.js';
 export { bindKeys } from './input.js';
 export { checkScene, assertValidScene } from './validate.js';
-export { Recorder, applyRecording, verifyReplay, digest } from './replay.js';
-export { toPNG, parseColor, encodePNG } from './png.js';
-export { loadSceneModule, createFrom } from './load.js';
+export { Recorder, applyRecording, verifyReplay, digest, hash64 } from './replay.js';
+export { toPNG, parseColor, encodePNG, setDeflate } from './png.js';
 export { collideOutline, outlinesOverlap, pointInPoly, entityPolys, outlinesTouch } from './collision.js';
 export { textPath, textShape, textWidth } from './text.js';
 export * as animate from './animate.js';
 export * as procedural from './procedural.js';
+export * as view from './view.js';
+export { follow, screenToWorld } from './view.js';
+export { SpatialHash, forEachPair } from './spatial.js';
+export { synth, sequence, noteFreq, toWAV, attachAudio, SAMPLE_RATE } from './audio.js';
+export { WebGLRenderer, autoRenderer } from './webgl.js';
+export { fanTriangles, strokeTriangles, coverQuad } from './tess.js';

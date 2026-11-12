@@ -5,6 +5,11 @@
 // part clipping, and HUD text rendered with the built-in vector stroke font.
 
 import { textPath } from './text.js';
+import { drawList } from './view.js';
+import { entityGeom } from './world.js';
+
+/** Local bounding radius incl. stroke padding, for culling. */
+export const cullRadius = (world) => (e) => { const g = entityGeom(world, e); return (g.bounds?.radius ?? 0) + (g.pad ?? 0); };
 
 const r = (n) => Math.round(n * 100) / 100;
 
@@ -63,14 +68,17 @@ function hudGroup(hud) {
 let hudColor = '#fff';
 
 /** Render the world to a standalone SVG string. */
-export function toSVG(world, { hud = true, hudFill = '#fff' } = {}) {
+export function toSVG(world, { hud = true, hudFill = '#fff', cull = true } = {}) {
   hudColor = hudFill;
   gradDefs.clear();
   const defs = Object.entries(world.shapes).map(([name, s]) =>
     `<g id="${name}">${s.parts.map((p) =>
       `<path d="${esc(p.d)}" ${partAttrs(p)}/>`).join('')}</g>`).join('');
-  const uses = world.entities.filter((e) => !e.hidden).map((e) => {
-    const t = `translate(${r(e.x)} ${r(e.y)}) rotate(${r(e.rot * 180 / Math.PI)}) scale(${r(e.scale)})`;
+  const cam = !!world.camera;
+  const uses = drawList(world, cullRadius(world), { cull }).map(([e, m]) => {
+    const t = cam
+      ? `matrix(${m.map((v) => +v.toFixed(4)).join(' ')})`
+      : `translate(${r(e.x)} ${r(e.y)}) rotate(${r(e.rot * 180 / Math.PI)}) scale(${r(e.scale)})`;
     if (e.d != null) {
       const p = { d: e.d, fill: e.fill, stroke: e.stroke, width: e.width };
       return `<path data-id="${e.id}" d="${esc(e.d)}" ${partAttrs(p)} transform="${t}"/>`;
@@ -142,10 +150,9 @@ export class CanvasRenderer {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.fillStyle = world.background;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-    for (const e of world.entities) {
-      if (e.hidden) continue;
+    for (const [e, m] of drawList(world, cullRadius(world))) {
       ctx.setTransform(sx, 0, 0, sy, 0, 0);
-      ctx.translate(e.x, e.y); ctx.rotate(e.rot); ctx.scale(e.scale, e.scale);
+      ctx.transform(m[0], m[1], m[2], m[3], m[4], m[5]);
       if (e.d != null) {
         let rec = this.entityPaths.get(e);
         if (!rec || rec.d !== e.d) { rec = { d: e.d, path: new Path2D(e.d) }; this.entityPaths.set(e, rec); }
@@ -155,7 +162,7 @@ export class CanvasRenderer {
       const shape = world.shapes[e.shape];
       if (!shape) continue;
       const { paths, clips } = this.compiled(shape);
-      shape.parts.forEach((p, i) => this.paint(ctx, p, paths[i], clips[i]));
+      for (let i = 0; i < shape.parts.length; i++) this.paint(ctx, shape.parts[i], paths[i], clips[i]);
     }
     if (world.state.hud) {
       ctx.setTransform(sx, 0, 0, sy, 0, 0);

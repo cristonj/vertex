@@ -12,6 +12,11 @@ export const scene = {
     bullet: { d: 'M-3 0 L3 0', stroke: '#fff', width: 3 },
   },
   entities: [{ id: 'ship', shape: 'ship', x: 400, y: 300, drag: 0.6, tags: ['ship', 'wrap'] }],
+  sounds: {
+    zap: { wave: 'square', freq: 1200, slide: -5000, decay: 0.08, volume: 0.25, duty: 0.3 },
+    boom: { wave: 'noise', freq: 900, slide: -1600, decay: 0.35, volume: 0.5, lowpass: 2500 },
+    hurt: { wave: 'saw', freq: 300, slide: -500, decay: 0.5, volume: 0.4, vibrato: 30 },
+  },
   state: { score: 0, lives: 3, hud: '' },
 };
 
@@ -35,6 +40,7 @@ export function createGame(opts) {
       cooldown -= dt;
       if (g.input.has('fire') && cooldown <= 0) {
         cooldown = 0.18;
+        g.sound('zap');
         w.spawn({ shape: 'bullet', x: s.x, y: s.y, rot: s.rot,
           vx: s.vx + Math.cos(s.rot) * 520, vy: s.vy + Math.sin(s.rot) * 520,
           tags: ['bullet', 'wrap'], data: { ttl: 0.9 } });
@@ -51,10 +57,11 @@ export function createGame(opts) {
         const rock = w.get(ev.b);
         if (ev.tags[0] === 'bullet') {
           dead.add(ev.a); dead.add(ev.b); w.state.score += 10;
+          g.sound('boom');
           if (rock.scale > 0.6) for (let k = 0; k < 2; k++) spawnRock(rock.x, rock.y, rock.scale / 2);
         } else {
           const s = w.get('ship');
-          w.state.lives--; s.x = 400; s.y = 300; s.vx = s.vy = 0;
+          w.state.lives--; g.sound('hurt'); s.x = 400; s.y = 300; s.vx = s.vy = 0;
           dead.add(ev.b);
           g.emit(w.state.lives <= 0 ? 'gameover' : 'died');
         }

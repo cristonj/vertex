@@ -1,3 +1,5 @@
+import { forEachPair } from './spatial.js';
+
 // Built-in systems. Each is a plain function (game, dt) => void — easy for agents to write more.
 
 /** Integrate velocity + angular velocity. Optional per-entity `drag` (0..1 per second). */
@@ -32,14 +34,8 @@ export function lifetime(game, dt) {
  */
 export function collide(pairs) {
   return (game) => {
-    const w = game.world;
     for (const [ta, tb] of pairs) {
-      for (const a of w.query(ta)) for (const b of w.query(tb)) {
-        if (a === b) continue;
-        const rr = w.radius(a) + w.radius(b);
-        const dx = a.x - b.x, dy = a.y - b.y;
-        if (dx * dx + dy * dy < rr * rr) game.emit('hit', { a: a.id, b: b.id, tags: [ta, tb] });
-      }
+      forEachPair(game.world, ta, tb, (a, b) => game.emit('hit', { a: a.id, b: b.id, tags: [ta, tb] }));
     }
   };
 }
