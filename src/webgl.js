@@ -12,6 +12,7 @@ import { entityGeom, inlineD, inlineStyle } from './world.js';
 import { parseColor } from './png.js';
 import { textPath } from './text.js';
 import { flatten, parsePath } from './path.js';
+import { projectSpace } from './space.js';
 
 const VS = `#version 300 es
 in vec2 a_pos;
@@ -42,6 +43,14 @@ void main() {
   o = c;
 }`;
 
+// 3D faces: one dynamic buffer of colored triangles per frame, drawn in painter's order.
+const VS3 = `#version 300 es
+in vec2 a_pos; in vec3 a_col; uniform vec2 u_res; out vec3 v_col;
+void main() { v_col = a_col; gl_Position = vec4(a_pos.x / u_res.x * 2.0 - 1.0, 1.0 - a_pos.y / u_res.y * 2.0, 0.0, 1.0); }`;
+const FS3 = `#version 300 es
+precision mediump float; in vec3 v_col; out vec4 o;
+void main() { o = vec4(v_col, 1.0); }`;
+
 const rgba = (s) => { const c = parseColor(s); return c ? [c[0] / 255, c[1] / 255, c[2] / 255, 1] : null; };
 
 export class WebGLRenderer {
@@ -57,7 +66,40 @@ export class WebGLRenderer {
     this.parts = new WeakMap();     // compiled part -> GPU mesh
     this.inline = new WeakMap();    // entity -> { d, mesh }
     this.hudMesh = new Map();       // hud string -> mesh
-    this.stats = { entities: 0, draws: 0 };
+    this.stats = { entities: 0, draws: 0, faces: 0 };
+    this.prog3 = link(gl, VS3, FS3);
+    this.u3res = gl.getUniformLocation(this.prog3, 'u_res');
+    this.vao3 = gl.createVertexArray(); this.buf3 = gl.createBuffer(); this.cap3 = 0;
+    gl.bindVertexArray(this.vao3); gl.bindBuffer(gl.ARRAY_BUFFER, this.buf3);
+    const p3 = gl.getAttribLocation(this.prog3, 'a_pos'), c3 = gl.getAttribLocation(this.prog3, 'a_col');
+    gl.enableVertexAttribArray(p3); gl.vertexAttribPointer(p3, 2, gl.FLOAT, false, 20, 0);
+    gl.enableVertexAttribArray(c3); gl.vertexAttribPointer(c3, 3, gl.FLOAT, false, 20, 8);
+    gl.bindVertexArray(null);
+  }
+
+  drawSpace(world) {
+    const gl = this.gl, faces = projectSpace(world);
+    this.stats.faces = faces.length;
+    if (!faces.length) return;
+    let n = 0;
+    for (const f of faces) n += f.tris.length;
+    if (!this.data3 || this.data3.length < n * 5) this.data3 = new Float32Array(Math.ceil(n * 5 * 1.5));
+    const d = this.data3;
+    let o = 0;
+    for (const f of faces) {
+      const r = f.rgb[0] / 255, g = f.rgb[1] / 255, b = f.rgb[2] / 255;
+      for (const i of f.tris) { const p = f.pts[i]; d[o++] = p[0]; d[o++] = p[1]; d[o++] = r; d[o++] = g; d[o++] = b; }
+    }
+    gl.useProgram(this.prog3);
+    gl.uniform2f(this.u3res, world.width, world.height);
+    gl.bindVertexArray(this.vao3);
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.buf3);
+    if (d.length > this.cap3) { gl.bufferData(gl.ARRAY_BUFFER, d, gl.DYNAMIC_DRAW); this.cap3 = d.length; }
+    else gl.bufferSubData(gl.ARRAY_BUFFER, 0, d, 0, o);
+    gl.disable(gl.STENCIL_TEST);
+    gl.drawArrays(gl.TRIANGLES, 0, o / 5);
+    gl.bindVertexArray(null);
+    this.stats.draws++;
   }
 
   buffer(data) {
@@ -92,10 +134,11 @@ export class WebGLRenderer {
     const bg = rgba(world.background) ?? [0, 0, 0, 1];
     gl.clearColor(bg[0], bg[1], bg[2], 1); gl.clearStencil(0);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.STENCIL_BUFFER_BIT);
+    this.stats.draws = 0;
+    if (world.space) this.drawSpace(world);
     gl.useProgram(this.prog);
     gl.uniform2f(u.res, world.width, world.height);
     gl.enable(gl.STENCIL_TEST);
-    this.stats.draws = 0;
     const list = drawList(world, cullRadius(world));
     this.stats.entities = list.length;
     for (const [e, m] of list) {

@@ -1,0 +1,58 @@
+{
+  "vertex": 1,
+  "title": "Skyline",
+  "description": "A 3D drive through a vector city: meshes, extrusions, flat shading, fog, a chase camera and 3D collision. One JSON file.",
+  "width": 480, "height": 300, "background": "#9ec4e8",
+  "space": {
+    "camera": { "x": 0, "y": -70, "z": -160, "yaw": 0, "pitch": 0.3, "fov": 65, "near": 2, "far": 1600 },
+    "light": [0.5, 1, 0.3], "ambient": 0.45,
+    "fog": { "color": "#9ec4e8", "near": 300, "far": 1500 }
+  },
+  "shapes": {
+    "car": { "mesh": {
+      "v": [[-8,-6,-14],[8,-6,-14],[8,0,-14],[-8,0,-14],[-8,-6,14],[8,-6,14],[8,0,14],[-8,0,14],[-6,-11,-4],[6,-11,-4],[6,-11,8],[-6,-11,8]],
+      "f": [[0,1,2,3],[5,4,7,6],[4,0,3,7],[1,5,6,2],[3,2,6,7],[0,8,9,1],[1,9,10,5],[5,10,11,4],[4,11,8,0],[8,11,10,9]]
+    }, "fill": "#ff5d73" },
+    "ground": { "mesh": { "v": [[-800,0,-800],[800,0,-800],[800,0,800],[-800,0,800]], "f": [[3,2,1,0]] }, "fill": "#4e6b52", "shade": false },
+    "tower": { "mesh": { "v": [[-20,-120,-20],[20,-120,-20],[20,0,-20],[-20,0,-20],[-20,-120,20],[20,-120,20],[20,0,20],[-20,0,20]],
+      "f": [[0,1,2,3],[5,4,7,6],[4,0,3,7],[1,5,6,2],[4,5,1,0]] }, "fill": "#d8dde6" },
+    "block": { "mesh": { "v": [[-30,-50,-30],[30,-50,-30],[30,0,-30],[-30,0,-30],[-30,-50,30],[30,-50,30],[30,0,30],[-30,0,30]],
+      "f": [[0,1,2,3],[5,4,7,6],[4,0,3,7],[1,5,6,2],[4,5,1,0]] }, "fill": "#b9a48a" },
+    "gem": { "mesh": { "v": [[0,-10,0],[7,0,0],[0,0,7],[-7,0,0],[0,0,-7],[0,10,0]],
+      "f": [[0,2,1],[0,3,2],[0,4,3],[0,1,4],[5,1,2],[5,2,3],[5,3,4],[5,4,1]] }, "fill": "#7df9ff", "doubleSided": false },
+    "sign": { "extrude": { "d": "M-30 -8 L30 -8 L30 8 L-30 8 Z", "depth": 3 }, "fill": "#ffcf5a" }
+  },
+  "entities": [
+    { "id": "ground", "shape": "ground", "x": 0, "y": 0, "z": 0 },
+    { "id": "player", "shape": "car", "x": 0, "y": 0, "z": 0, "ry": 0, "rz": 0, "tags": ["player"], "data": { "speed": 0 } },
+    { "shape": "tower", "x": -120, "y": 0, "z": 220, "tags": ["building"] },
+    { "shape": "tower", "x": 140, "y": 0, "z": 320, "tags": ["building"] },
+    { "shape": "block", "x": 160, "y": 0, "z": 80, "tags": ["building"] },
+    { "shape": "block", "x": -180, "y": 0, "z": 40, "tags": ["building"] },
+    { "shape": "tower", "x": 0, "y": 0, "z": 520, "tags": ["building"], "scale": 1.4 },
+    { "shape": "block", "x": -260, "y": 0, "z": 420, "tags": ["building"] },
+    { "shape": "block", "x": 300, "y": 0, "z": 560, "tags": ["building"] },
+    { "shape": "sign", "x": 0, "y": -40, "z": 140, "ry": 0, "vry": 0.6 }
+  ],
+  "state": { "gems": 0, "hud": "" },
+  "keys": { "ArrowLeft": "left", "ArrowRight": "right", "ArrowUp": "go", "ArrowDown": "back", "a": "left", "d": "right", "w": "go", "s": "back" },
+  "systems": ["motion", "motion3d", { "collide3d": [["player", "gem"], ["player", "building"]] }, "rules", { "chase": { "id": "player", "distance": 150, "height": 65, "lerp": 0.12, "pitch": 0.32 } }],
+  "rules": [
+    { "on": "start", "do": [
+      "let i = 0",
+      "if (true) { spawn('gem', {x: rand(-300, 300), y: -20, z: rand(60, 700), vry: 2, tags: ['gem']}); spawn('gem', {x: rand(-300, 300), y: -20, z: rand(60, 700), vry: 2, tags: ['gem']}); spawn('gem', {x: rand(-300, 300), y: -20, z: rand(60, 700), vry: 2, tags: ['gem']}); spawn('gem', {x: rand(-300, 300), y: -20, z: rand(60, 700), vry: 2, tags: ['gem']}); spawn('gem', {x: rand(-300, 300), y: -20, z: rand(60, 700), vry: 2, tags: ['gem']}); spawn('gem', {x: rand(-300, 300), y: -20, z: rand(60, 700), vry: 2, tags: ['gem']}) }"
+    ] },
+    { "each": "player", "do": [
+      "let turn = (held('right') ? 1 : 0) - (held('left') ? 1 : 0)",
+      "let thrust = (held('go') ? 1 : 0) - (held('back') ? 0.6 : 0)",
+      "self.data.speed = self.data.speed + (thrust * 220 - self.data.speed) * min(1, 2.5 * dt)",
+      "self.ry += turn * 2.2 * dt * (self.data.speed / 220 + (self.data.speed < 0 ? -0.2 : 0.2))",
+      "self.vx = sin(self.ry) * self.data.speed",
+      "self.vz = cos(self.ry) * self.data.speed",
+      "self.rz = -turn * 0.08 * (self.data.speed / 220)"
+    ] },
+    { "on": "hit", "tags": ["player", "gem"], "do": "despawn(b); state.gems += 1; spawn('gem', {x: rand(-300, 300), y: -20, z: rand(60, 700), vry: 2, tags: ['gem']})" },
+    { "on": "hit", "tags": ["player", "building"], "do": "a.x -= a.vx * dt * 3; a.z -= a.vz * dt * 3; a.data.speed = -a.data.speed * 0.3" },
+    { "do": "state.hud = 'GEMS ' + str(state.gems)" }
+  ]
+}

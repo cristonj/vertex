@@ -8,9 +8,10 @@
   import { loadCartridge, CanvasRenderer, WebGLRenderer, Timeline, attachAudio } from '../../src/index.js';
   const out = {};
   try {
-    for (const src of ['../../examples/starfall/starfall.json', '../../conformance/cartridges/torture.json']) {
+    for (const src of ['../../examples/starfall/starfall.json', '../../conformance/cartridges/torture.json', '../../examples/skyline/skyline.json']) {
       const doc = await (await fetch(src)).json();
       const g = loadCartridge(doc, { seed: 3 });
+      if (doc.keys?.ArrowUp) g.press(doc.keys.ArrowUp);
       g.step(400);
       const W = doc.width, H = doc.height;
       const a = document.getElementById('gl'), b = document.getElementById('c2');

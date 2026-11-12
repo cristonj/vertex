@@ -22,6 +22,7 @@ import * as animate from './animate.js';
 import { physics } from './physics.js';
 import { particles } from './particles.js';
 import { follow } from './view.js';
+import { motion3d, chaseCamera, collide3d } from './space.js';
 
 const FACTORIES = {
   motion: () => systems.motion,
@@ -33,6 +34,9 @@ const FACTORIES = {
   keyframes: () => animate.keyframes,
   physics: () => physics,
   particles: () => particles,
+  motion3d: () => motion3d,
+  chase: (arg) => (typeof arg === 'string' ? chaseCamera(arg) : chaseCamera(arg.id, arg)),
+  collide3d: (pairs) => collide3d(pairs),
   follow: (arg) => (typeof arg === 'string' ? follow(arg) : follow(arg.id, arg.lerp ?? 1)),
 };
 

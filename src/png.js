@@ -8,6 +8,7 @@ import { flatten, parsePath } from './path.js';
 import { textPath } from './text.js';
 import { drawList, invert, apply, matScale } from './view.js';
 import { cullRadius } from './render.js';
+import { projectSpace } from './space.js';
 import { entityGeom, inlineD, inlineStyle } from './world.js';
 
 const NAMED = {
@@ -63,6 +64,14 @@ export function toPNG(world, { width = world.width, height = world.height } = {}
   for (let i = 0; i < px.length; i += 3) { px[i] = bg[0]; px[i + 1] = bg[1]; px[i + 2] = bg[2]; }
 
   const sx = width / world.width, sy = height / world.height;
+  if (world.space) {
+    for (const f of projectSpace(world)) {
+      const paths = flatten(parsePath(f.d)).map((poly) => poly.map(([x, y]) => [x * sx, y * sy]));
+      fillPolys(px, width, height, paths, parseColor(f.fill));
+      const st = parseColor(f.stroke);
+      if (st) for (const poly of strokePolys(paths, (f.width ?? 1) * ((sx + sy) / 2))) fillPolys(px, width, height, [poly], st);
+    }
+  }
   for (const [e, m] of drawList(world, cullRadius(world))) {
     const parts = inlineD(e) != null
       ? [{ polys: entityGeom(world, e).polys, ...inlineStyle(e) }]

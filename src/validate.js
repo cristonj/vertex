@@ -5,7 +5,7 @@
 const isNum = (v) => typeof v === 'number' && Number.isFinite(v);
 const isStr = (v) => typeof v === 'string';
 
-const ENTITY_NUMS = ['x', 'y', 'rot', 'scale', 'vx', 'vy', 'vr', 'drag', 'layer', 'parallax', 'width', 'size'];
+const ENTITY_NUMS = ['x', 'y', 'rot', 'scale', 'vx', 'vy', 'vr', 'drag', 'layer', 'parallax', 'width', 'size', 'z', 'rx', 'ry', 'rz', 'vz', 'vrx', 'vry', 'vrz'];
 
 export function checkScene(doc) {
   const errors = [];
@@ -61,6 +61,9 @@ function checkShape(s, path, err) {
     if (!s.parts.length) err(`${path}.parts`, 'must not be empty');
     s.parts.forEach((p, i) => checkShape(p, `${path}.parts[${i}]`, err));
     if (s.d !== undefined) err(`${path}.d`, 'a shape with parts should not also have d');
+  } else if (s.mesh || s.extrude) {
+    if (s.mesh && !(Array.isArray(s.mesh.v) && Array.isArray(s.mesh.f))) err(`${path}.mesh`, 'must be { v: [[x,y,z]...], f: [[i,j,k]...] }');
+    if (s.extrude && !isStr(s.extrude.d)) err(`${path}.extrude.d`, 'must be an SVG path string');
   } else if (!isStr(s.d) || !s.d.trim()) {
     err(`${path}.d`, 'must be a non-empty SVG path string (or provide parts)');
   }

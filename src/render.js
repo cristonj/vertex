@@ -6,6 +6,7 @@
 
 import { textPath } from './text.js';
 import { drawList } from './view.js';
+import { projectSpace, meshOf } from './space.js';
 import { entityGeom, inlineD, inlineStyle } from './world.js';
 
 /** Local bounding radius incl. stroke padding, for culling. */
@@ -66,7 +67,11 @@ export function toSVG(world, { hud = true, hudFill = '#fff', cull = true } = {})
     `<g id="${name}">${s.parts.map((p, i) =>
       `<path d="${esc(p.d)}" ${partAttrs(p, `${name}-${i}`)}/>`).join('')}</g>`).join('');
   const cam = !!world.camera;
-  const uses = drawList(world, cullRadius(world), { cull }).map(([e, m]) => {
+  // 3D: projected, shaded faces (back to front) form the world; 2D entities draw on top.
+  const faces = world.space ? projectSpace(world).map((f) =>
+    `<path data-id="${f.id}" d="${f.d}" ${partAttrs({ fill: f.fill, stroke: f.stroke, width: f.width }, '')}/>`).join('') : '';
+  const uses = faces + drawList(world, cullRadius(world), { cull }).map(([e, m]) => {
+    if (e.shape && meshOf(world.shapes[e.shape])) return '';
     const t = cam
       ? `matrix(${m.map((v) => +v.toFixed(4)).join(' ')})`
       : `translate(${r(e.x)} ${r(e.y)}) rotate(${r(e.rot * 180 / Math.PI)}) scale(${r(e.scale)})`;
@@ -142,6 +147,16 @@ export class CanvasRenderer {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.fillStyle = world.background;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
+    if (world.space) {
+      ctx.setTransform(sx, 0, 0, sy, 0, 0);
+      ctx.lineJoin = 'round';
+      for (const f of projectSpace(world)) {
+        const p = new Path2D(f.d);
+        ctx.fillStyle = f.fill; ctx.fill(p);
+        if (f.stroke) { ctx.strokeStyle = f.stroke; ctx.lineWidth = f.width ?? 1; ctx.stroke(p); }
+        else { ctx.strokeStyle = f.fill; ctx.lineWidth = 0.6; ctx.stroke(p); } // hide AA seams between faces
+      }
+    }
     for (const [e, m] of drawList(world, cullRadius(world))) {
       ctx.setTransform(sx, 0, 0, sy, 0, 0);
       ctx.transform(m[0], m[1], m[2], m[3], m[4], m[5]);

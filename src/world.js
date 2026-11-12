@@ -31,7 +31,8 @@ export class World {
     this.sounds = structuredClone(doc.sounds ?? {});
     this.physics = doc.physics ? structuredClone(doc.physics) : undefined;
     this.scenes = doc.scenes ? structuredClone(doc.scenes) : undefined;
-    this.timers = structuredClone(doc.timers ?? []);   // [{ at, type, ...payload }], fired by Game.step
+    this.timers = structuredClone(doc.timers ?? []);
+    this.space = doc.space ? structuredClone(doc.space) : undefined;   // [{ at, type, ...payload }], fired by Game.step
     this._byId = new Map();
     this.time = 0;
     this.frame = 0;
@@ -47,7 +48,7 @@ export class World {
 
   /** Register a vector shape. Geometry is parsed once and cached (per part and combined). */
   defineShape(name, shape) {
-    const parts = shape.parts ?? [shape];
+    const parts = shape.mesh || shape.extrude ? [] : shape.parts ?? [shape]; // 3D shapes have no 2D parts
     const compiled = parts.map((p) => {
       const cmds = parsePath(p.d);
       const polys = flatten(cmds);
@@ -102,6 +103,7 @@ export class World {
       ...(this.physics ? { physics: this.physics } : {}),
       ...(this.scenes ? { scenes: this.scenes } : {}),
       ...(this.timers.length ? { timers: this.timers } : {}),
+      ...(this.space ? { space: this.space } : {}),
       shapes: Object.fromEntries(Object.entries(this.shapes).map(([k, v]) => [k, v.src])),
       entities: this.entities.map((e) => ({ ...e })),
       state: this.state,
