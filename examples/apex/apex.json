@@ -1,7 +1,7 @@
 {
   "vertex": 1,
   "title": "Apex",
-  "description": "A cabinet-style sunset racer. Left/right steer, up accelerates, down brakes, space boosts. Pass traffic and reach 12 km before time runs out. Checkpoints add time.",
+  "description": "A coast-to-highlands arcade race. Smooth steering, braking, boost and near-miss rewards. Arrows drive, space boosts. Reach 12 km; checkpoints add time.",
   "width": 480,
   "height": 360,
   "background": "#302151",
@@ -60,6 +60,72 @@
         }
       ]
     },
+    "goldcar": {
+      "parts": [
+        {
+          "d": "M-25 0L-21 -20L-13 -29H13L21 -20L25 0Z",
+          "fill": "#ffcf5a",
+          "stroke": "#192238",
+          "width": 1.5
+        },
+        {
+          "d": "M-15 -20L-10 -27H10L15 -20Z",
+          "fill": "#192d50"
+        },
+        {
+          "d": "M-24 -7H24V0H-24Z",
+          "fill": "#ffcf5a"
+        },
+        {
+          "d": "M-22 -5H-12M12 -5H22",
+          "stroke": "#ffcf5a",
+          "width": 3
+        },
+        {
+          "d": "M-7 -4H7V0H-7Z",
+          "fill": "#131a2a"
+        }
+      ]
+    },
+    "purplecar": {
+      "parts": [
+        {
+          "d": "M-25 0L-21 -20L-13 -29H13L21 -20L25 0Z",
+          "fill": "#b79aff",
+          "stroke": "#192238",
+          "width": 1.5
+        },
+        {
+          "d": "M-15 -20L-10 -27H10L15 -20Z",
+          "fill": "#192d50"
+        },
+        {
+          "d": "M-24 -7H24V0H-24Z",
+          "fill": "#b79aff"
+        },
+        {
+          "d": "M-22 -5H-12M12 -5H22",
+          "stroke": "#ffcf5a",
+          "width": 3
+        },
+        {
+          "d": "M-7 -4H7V0H-7Z",
+          "fill": "#131a2a"
+        }
+      ]
+    },
+    "palm": {
+      "parts": [
+        {
+          "d": "M-2 0L1 -48H5L2 0Z",
+          "fill": "#624b43"
+        },
+        {
+          "d": "M3 -45Q-24 -65 -34 -42Q-16 -51 3 -45Q15 -66 30 -43Q14 -51 3 -45Q-9 -77 -21 -61Q-5 -63 3 -45",
+          "fill": "#417c5e"
+        }
+      ]
+    },
     "post": {
       "d": "M-2 0V-25H2V0Z",
       "fill": "#fff"
@@ -87,17 +153,25 @@
   },
   "state": {
     "score": 0,
+    "bonus": 0,
+    "passes": 0,
+    "near": 0,
     "over": false,
     "hud": "",
-    "speed": 130,
+    "speed": 0,
     "time": 60,
     "dist": 0,
     "pos": 0,
+    "steer": 0,
     "boost": 100,
     "crash": 0,
-    "st": 0.8,
+    "st": 0.7,
     "check": 1,
-    "curve": 0
+    "curve": 0,
+    "lastLane": 0,
+    "banner": 3,
+    "notice": "ARROWS DRIVE   SPACE BOOST",
+    "zone": 0
   },
   "keys": {
     "ArrowLeft": "left",
@@ -113,31 +187,32 @@
     "Enter": "start"
   },
   "systems": [
-    {
-      "collideOutline": [
-        [
-          "player",
-          "traffic"
-        ]
-      ]
-    },
+    "lifetime",
     "rules"
   ],
   "scenes": {
     "race": {
       "state": {
         "score": 0,
+        "bonus": 0,
+        "passes": 0,
+        "near": 0,
         "over": false,
         "hud": "",
-        "speed": 130,
+        "speed": 0,
         "time": 60,
         "dist": 0,
         "pos": 0,
+        "steer": 0,
         "boost": 100,
         "crash": 0,
-        "st": 0.8,
+        "st": 0.7,
         "check": 1,
-        "curve": 0
+        "curve": 0,
+        "lastLane": 0,
+        "banner": 3,
+        "notice": "ARROWS DRIVE   SPACE BOOST",
+        "zone": 0
       },
       "entities": [
         {
@@ -177,6 +252,7 @@
           "layer": -3
         },
         {
+          "id": "verge",
           "d": "M0 112H480V360H0Z",
           "x": 0,
           "y": 0,
@@ -192,6 +268,42 @@
           "tags": [
             "player"
           ]
+        },
+        {
+          "id": "flame",
+          "d": "M-13 0L-9 17L-4 0M4 0L9 17L13 0",
+          "x": 240,
+          "y": 319,
+          "stroke": "#ffcf5a",
+          "width": 3,
+          "opacity": 0,
+          "layer": 9
+        },
+        {
+          "id": "boostbar",
+          "d": "M0 0H100V4H0Z",
+          "x": 14,
+          "y": 336,
+          "fill": "#7df9ff",
+          "layer": 21
+        },
+        {
+          "id": "progress",
+          "d": "M0 0H452V3H0Z",
+          "x": 14,
+          "y": 29,
+          "fill": "#ffcf5a",
+          "layer": 21
+        },
+        {
+          "id": "notice",
+          "text": "ARROWS DRIVE   SPACE BOOST",
+          "x": 240,
+          "y": 67,
+          "size": 11,
+          "stroke": "#fff",
+          "width": 1.5,
+          "layer": 22
         },
         {
           "id": "info",
@@ -224,52 +336,48 @@
     {
       "on": "scene",
       "when": "event.name == 'race'",
-      "do": "repeat (30) { spawn(null, {d: 'M0 0', x: 0, y: 0, tags: ['road'], layer: -1, data: {n: i}}); spawn(null, {id: 'lane' + str(i), d: 'M0 0', x: 0, y: 0, layer: 0, fill: '#e2c4b2'}) }; repeat (16) spawn('post', {x: 0, y: 0, tags: ['post'], layer: 1, data: {q: floor(i / 2) / 8, side: i % 2 == 0 ? -1 : 1}})"
+      "do": "repeat (32) { spawn(null,{d:'M0 0',x:0,y:0,tags:['road'],layer:-1,data:{n:i}}); spawn(null,{id:'lane'+str(i),d:'M0 0',x:0,y:0,layer:0,fill:'#e2d8bc'}); spawn(null,{id:'curb'+str(i),d:'M0 0',x:0,y:0,layer:0,fill:'#f4d8c1'}) }; repeat (20) spawn(i % 4 == 0 ? 'palm' : 'post',{x:0,y:0,tags:['post'],layer:1,data:{z:floor(i/2)*160,side:i%2==0?-1:1}})"
     },
     {
       "each": "player",
       "when": "!state.over",
       "do": [
-        "let steer = (held('right') ? 1 : 0) - (held('left') ? 1 : 0); state.curve = sin(state.dist / 1400) * 95",
-        "state.pos = clamp(state.pos + steer * 1.5 * dt - sin(state.dist / 1400) * state.speed * 0.0007 * dt, -1.05, 1.05); self.x = 240 + state.pos * 170; self.rot = steer * 0.06",
-        "let boosting = held('fire') && state.boost > 0; let target = (held('go') ? 230 : 155) - (held('brake') ? 100 : 0) + (boosting ? 110 : 0); if (abs(state.pos) > 0.9) target *= 0.55; if (boosting) { state.boost = max(0, state.boost - 30 * dt) } else { state.boost = min(100, state.boost + 9 * dt) }",
-        "state.crash = max(0, state.crash - dt); if (state.crash > 0) target = 55; self.opacity = state.crash > 0 && floor(time * 14) % 2 == 0 ? 0.4 : 1; state.speed += (target - state.speed) * min(1, 2.5 * dt); state.dist += state.speed * dt; state.time -= dt; state.score = floor(state.dist)",
-        "if (state.dist > state.check * 4000 && state.check < 3) { state.check += 1; state.time += 15; sound('hit') }; if (state.time <= 0 || state.dist >= 12000) { state.time = max(0, state.time); state.over = true; spawn(null, {text: state.dist >= 12000 ? 'FINISH LINE' : 'TIME UP', size: 28, x: 240, y: 180, layer: 30, stroke: '#ffcf5a', width: 2}) }"
+        "state.zone = min(2,floor(state.dist/4000)); state.curve = sin(state.dist/1000) * 65 + sin(state.dist/2700) * 35",
+        "let input = clamp(axis('x') + (held('right') ? 1 : 0) - (held('left') ? 1 : 0),-1,1); state.steer += (input-state.steer)*min(1,10*dt); state.pos = clamp(state.pos + state.steer*(0.8+state.speed/250)*dt,-1.22,1.22); self.x = 240+state.pos*222; self.rot = state.steer*0.045",
+        "let boosting = held('fire') && state.boost > 1 && !held('brake'); let target = (held('go') ? 240 : 175) - (held('brake') ? 125 : 0) + (boosting ? 90 : 0); if(abs(state.pos)>0.9) target *= 0.5; if(boosting) { state.boost=max(0,state.boost-26*dt) } else { state.boost=min(100,state.boost+8*dt) }",
+        "state.crash = max(0,state.crash-dt); if(state.crash>0) target=65; self.opacity=state.crash>0 && floor(time*14)%2==0?0.35:1; state.speed += (target-state.speed)*min(1,(held('brake')?5:1.8)*dt); state.dist += state.speed*dt; state.time -= dt; state.score=floor(state.dist)+state.bonus",
+        "let f=get('flame'); f.x=self.x; f.opacity=boosting?0.7+sin(time*50)*0.3:0; let b=get('boostbar'); b.scale=state.boost/100; get('progress').scale=clamp(state.dist/12000,0,1)",
+        "state.banner=max(0,state.banner-dt); if(state.dist>state.check*4000 && state.check<3) { state.check+=1; state.time+=15; state.banner=3; state.notice='CHECKPOINT   +15 SECONDS'; sound('hit') }; if(state.time<=0 || state.dist>=12000) { state.time=max(0,state.time); state.over=true; state.banner=999; state.notice=state.dist>=12000?'FINISH LINE   ENTER TO RACE AGAIN':'TIME UP   ENTER TO RETRY'; get('flame').opacity=0 }"
       ]
     },
     {
       "each": "road",
       "when": "true",
       "do": [
-        "let t = self.data.n / 30; let u = (self.data.n + 1) / 30; let y = 112 + t * t * 248; let z = 112 + u * u * 248; let c = 240 + state.curve * (1 - t) * (1 - t); let d = 240 + state.curve * (1 - u) * (1 - u); let a = 12 + t * t * 250; let b = 12 + u * u * 250; let band = floor(t * 30 + state.dist / 55) % 2 == 0",
-        "self.d = 'M' + str(c - a) + ' ' + str(y) + 'H' + str(c + a) + 'L' + str(d + b) + ' ' + str(z) + 'H' + str(d - b) + 'Z'; self.fill = band ? '#363247' : '#302d40'; let lane = get('lane' + str(self.data.n)); lane.d = 'M0 0'",
-        "if (band) { let w = max(1, t * 2); lane.d += 'M' + str(c - a / 3 - w) + ' ' + str(y) + 'H' + str(c - a / 3 + w) + 'L' + str(d - b / 3 + w) + ' ' + str(z) + 'H' + str(d - b / 3 - w) + 'Z'; lane.d += 'M' + str(c + a / 3 - w) + ' ' + str(y) + 'H' + str(c + a / 3 + w) + 'L' + str(d + b / 3 + w) + ' ' + str(z) + 'H' + str(d + b / 3 - w) + 'Z' }"
+        "let t=self.data.n/32; let u=(self.data.n+1)/32; let y=112+t*t*248; let z=112+u*u*248; let q=(y-112)/206; let v=(z-112)/206; let c=240+state.curve*(1-q)*(1-q); let d=240+state.curve*(1-v)*(1-v); let a=12+q*210; let b=12+v*210; let band=floor(q*28+state.dist/45)%2==0",
+        "self.d='M'+str(c-a)+' '+str(y)+'H'+str(c+a)+'L'+str(d+b)+' '+str(z)+'H'+str(d-b)+'Z'; self.fill=band?'#353548':'#303043'; let lane=get('lane'+str(self.data.n)); lane.d='M0 0'; let curb=get('curb'+str(self.data.n)); curb.fill=band?'#f4d8c1':'#d05b62'; curb.d='M'+str(c-a)+' '+str(y)+'H'+str(c-a*0.96)+'L'+str(d-b*0.96)+' '+str(z)+'H'+str(d-b)+'ZM'+str(c+a)+' '+str(y)+'H'+str(c+a*0.96)+'L'+str(d+b*0.96)+' '+str(z)+'H'+str(d+b)+'Z'",
+        "if(band) { let w=max(0.5,q*1.8); lane.d+='M'+str(c-a/3-w)+' '+str(y)+'H'+str(c-a/3+w)+'L'+str(d-b/3+w)+' '+str(z)+'H'+str(d-b/3-w)+'ZM'+str(c+a/3-w)+' '+str(y)+'H'+str(c+a/3+w)+'L'+str(d+b/3+w)+' '+str(z)+'H'+str(d+b/3-w)+'Z' }"
       ]
     },
     {
       "each": "post",
       "when": "!state.over",
-      "do": "self.data.q = (self.data.q + state.speed * dt / 2200) % 1; let q = self.data.q; self.x = 240 + state.curve * (1 - q) * (1 - q) + self.data.side * (18 + q * q * 265); self.y = 112 + q * q * 248; self.scale = 0.1 + q * 1.2"
+      "do": "self.data.z-=state.speed*dt; if(self.data.z < -35) self.data.z+=1600; let k=180/(180+self.data.z); self.x=240+state.curve*(1-k)*(1-k)+self.data.side*(20+222*k); self.y=112+k*206; self.scale=k; self.layer=1+k*7"
     },
     {
-      "do": "if (!state.over && state.scene == 'race') { state.st -= dt; if (state.st <= 0) { spawn('traffic', {x: 240, y: 112, scale: 0.1, layer: 2, tags: ['traffic'], data: {q: 0, lane: (floor(rand(0, 3)) - 1) * 0.63}}); state.st = rand(1.1, 1.9) } }"
+      "do": "if(!state.over && state.scene=='race') { state.st-=dt; if(state.st<=0) { let lane=floor(rand(0,3))-1; if(lane==state.lastLane) lane=(lane+2)%3-1; state.lastLane=lane; spawn(['traffic','goldcar','purplecar'][floor(rand(0,3))],{x:240,y:112,scale:0.1,layer:2,tags:['traffic'],data:{z:1450,lane:lane*0.67,v:rand(60,105),passed:false}}); state.st=rand(1.0,1.8)-state.zone*0.12 } }"
     },
     {
       "each": "traffic",
       "when": "!state.over",
-      "do": "self.data.q += max(30, state.speed - 65) * dt / 1500; let q = self.data.q; self.x = 240 + state.curve * (1 - q) * (1 - q) + self.data.lane * (12 + q * q * 250); self.y = 112 + q * q * 248; self.scale = 0.1 + q * 1.4; self.layer = 2 + q * 7; if (q > 1.1) despawn(self)"
+      "do": [
+        "self.data.z-=(state.speed-self.data.v)*dt; let k=180/max(90,180+self.data.z); self.x=240+state.curve*(1-k)*(1-k)+self.data.lane*(12+210*k); self.y=112+k*206; self.scale=k; self.layer=2+k*7",
+        "let gap=abs(self.data.lane-state.pos); if(abs(self.data.z)<26 && gap<0.23 && state.crash<=0) { state.crash=1.0; state.time=max(0,state.time-2); state.speed*=0.45; state.banner=1.5; state.notice='CONTACT   -2 SECONDS'; sound('lose'); despawn(self) }",
+        "if(alive(self) && self.data.z < -32 && !self.data.passed) { self.data.passed=true; state.passes+=1; state.bonus+=25; if(gap>=0.23 && gap<0.43) { state.near+=1; state.bonus+=100; state.boost=min(100,state.boost+12); state.banner=1.3; state.notice='NEAR MISS   +100'; sound('hit') } }; if(self.data.z < -65 || self.data.z>2000) despawn(self)"
+      ]
     },
     {
-      "on": "hit",
-      "tags": [
-        "player",
-        "traffic"
-      ],
-      "when": "!state.over && state.crash <= 0",
-      "do": "state.crash = 1.2; state.time = max(0, state.time - 3); state.speed = 45; despawn(b); sound('lose')"
-    },
-    {
-      "do": "if (state.over && pressed('start')) goto('race'); let t = get('dash'); if (t) t.text = 'TIME ' + str(ceil(state.time)) + '   KMH ' + str(floor(state.speed)); t = get('info'); if (t) t.text = state.over ? 'ENTER TO RACE AGAIN' : str(floor(state.dist)) + '/12000 M   BOOST ' + str(floor(state.boost))"
+      "do": "if(state.over && pressed('start')) goto('race'); let t=get('dash'); if(t) t.text='TIME '+str(ceil(state.time))+'   KMH '+str(floor(state.speed)); t=get('info'); if(t) t.text=['COAST','HIGHLANDS','NIGHT RUN'][state.zone]+'   '+str(floor(state.dist))+'/12000 M   PASS '+str(state.passes); t=get('notice'); if(t) { t.text=state.notice; t.opacity=state.banner>0?1:0 }; t=get('verge'); if(t) t.fill=['#28594b','#756044','#243b4c'][state.zone]"
     }
   ]
 }

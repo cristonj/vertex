@@ -1,0 +1,43 @@
+import {readFileSync,writeFileSync} from 'node:fs';
+const d=JSON.parse(readFileSync('examples/pulse/pulse.json','utf8'));
+d.description='Four rotating formations: arrowhead, diamond, twin wings and orbit. Enemies enter in ranks, break formation to dive, then rejoin. Arrows/A-D move; space fires.';
+d.shapes.fighter={d:'M0 -12L7 -3L15 -6L9 8L0 4L-9 8L-15 -6L-7 -3Z',fill:'#ff7b9c',stroke:'#762b55',width:1};
+d.shapes.beetle={d:'M-12 -5L-5 -11H5L12 -5V5L5 11H-5L-12 5ZM-17 -4H-12M12 -4H17M-17 6H-12M12 6H17',fill:'#ffcf5a',stroke:'#b98741',width:1};
+d.shapes.dot={d:'M-1 0H1',stroke:'#304968',width:1};
+const initial={score:0,over:false,hud:'',lives:3,wave:0,inv:0,cool:0,fireT:1.5,diveT:3,phase:0,age:0,cx:240,cy:132,formation:0,next:0};
+d.state={...initial};d.scenes.play={state:{...initial},entities:[
+  {id:'player',shape:'ship',x:240,y:316,tags:['player']},
+  {id:'info',text:'SPACE FIRES   ARROWS MOVE',size:10,x:240,y:350,stroke:'#adc7e3',width:1.2},
+  {id:'formation',text:'ARROWHEAD',size:10,x:240,y:37,stroke:'#b79aff',width:1.3}
+]};
+d.systems=['motion','lifetime',{collideOutline:[['shot','alien'],['player','bolt'],['player','alien']]},'rules'];
+d.rules=[
+  {on:'start',do:"goto('play')"},
+  {on:'scene',when:"event.name == 'play'",do:"repeat (35) spawn('dot', {x: rand(4,W-4), y: rand(45,H-30), vy: rand(8,20), tags: ['star'], layer: -1})"},
+  {each:'star',do:"if (self.y > H) self.y = 35"},
+  {when:"!state.over && state.scene == 'play' && count('alien') == 0",do:[
+    "state.wave += 1; state.formation = (state.wave - 1) % 4; state.age = 0; state.cx = 240; state.cy = 132; state.phase = 0; state.fireT = 1.6; state.diveT = 3.6",
+    "let n = state.formation == 0 ? 21 : (state.formation == 1 ? 25 : 24); repeat (n) { let x = 0; let y = 0; if (state.formation == 0) { let col = i % 7 - 3; let row = floor(i / 7); x = col * 43; y = abs(col) * 13 + row * 30 - 55 }; if (state.formation == 1) { let row = floor(i / 5) - 2; let col = i % 5 - 2; x = (col + row) * 32; y = (row - col) * 16 }; if (state.formation == 2) { let side = i < 12 ? -1 : 1; let k = i % 12; x = side * (40 + (k % 4) * 35); y = floor(k / 4) * 30 + (k % 4) * 6 - 40 }; if (state.formation == 3) { let ring = i < 8 ? 0 : 1; let a = (ring == 0 ? i : i-8) * PI * 2 / (ring == 0 ? 8 : 16); x = cos(a) * (ring == 0 ? 70 : 143); y = sin(a) * (ring == 0 ? 40 : 76) }; spawn(i % 6 == 0 ? 'beetle' : (i % 2 == 0 ? 'fighter' : 'alien'), {x: 240 + x, y: -70 - i * 7, tags: ['alien'], data: {sx: x, sy: y, slot: i, mode: 0, dive: 0}}) }",
+    "get('formation').text = ['ARROWHEAD','DIAMOND','TWIN WINGS','ORBIT'][state.formation]"
+  ]},
+  {each:'player',when:'!state.over',do:[
+    "let steer = clamp((held('right') ? 1 : 0) - (held('left') ? 1 : 0) + axis('x'),-1,1); self.x = clamp(self.x + steer * 300 * dt,20,W-20)",
+    "state.cool -= dt; state.inv = max(0, state.inv-dt); self.opacity = state.inv > 0 && floor(time * 14) % 2 == 0 ? 0.3 : 1",
+    "if (held('fire') && state.cool <= 0) { spawn('shot', {x: self.x, y: self.y - 18, vy: -450, tags: ['shot'], data: {ttl: 1}}); state.cool = 0.18 }"
+  ]},
+  {when:'!state.over',do:[
+    "state.age += dt; state.phase += dt; state.cx = 240 + sin(state.phase * 0.65) * 55; state.cy = 132 + min(25, state.age * 0.6) + sin(state.phase) * 7",
+    "state.fireT -= dt; if (state.age > 2 && state.fireT <= 0 && count('alien') > 0) { let enemies = all('alien'); let e = enemies[floor(rand(0,count('alien')))]; if (e.y > 35 && e.y < 230) { let p = get('player'); spawn('bolt', {x: e.x, y: e.y + 12, vx: clamp((p.x-e.x)*0.35,-65,65), vy: 145 + min(70,state.wave * 8), tags: ['bolt'], data: {ttl: 3}}) }; state.fireT = max(0.38, 1.0-state.wave*0.05) }",
+    "state.diveT -= dt; if (state.age > 3 && state.diveT <= 0 && count('alien') > 0) { let enemies = all('alien'); let e = enemies[floor(rand(0,count('alien')))]; if (e.data.mode == 0) { e.data.mode = 1; e.data.dive = 0; e.vx = clamp((get('player').x-e.x)*0.5,-100,100); e.vy = 95 + min(80,state.wave*8) }; state.diveT = max(0.9,2.8-state.wave*0.15) }"
+  ]},
+  {each:'alien',when:'!state.over',do:[
+    "if (self.data.mode == 0) { let x = state.cx + self.data.sx; let y = state.cy + self.data.sy; if (state.formation == 3) { let ring = self.data.slot < 8 ? 0 : 1; let a = (ring == 0 ? self.data.slot : self.data.slot-8) * PI * 2 / (ring == 0 ? 8 : 16) + state.phase * 0.2; x = state.cx + cos(a) * (ring == 0 ? 70 : 143); y = state.cy + sin(a) * (ring == 0 ? 40 : 76) }; self.x += (x-self.x) * min(1,4*dt); self.y += (y-self.y) * min(1,3*dt); self.rot *= max(0,1-8*dt) }",
+    "if (self.data.mode == 1) { self.data.dive += dt; self.vx += sin(self.data.dive*4) * 70 * dt; self.rot = atan2(self.vy,self.vx) - PI/2; if (self.y > H+25) { self.y = -25; self.vx = 0; self.vy = 0; self.data.mode = 0 } }"
+  ]},
+  {on:'hit',tags:['shot','alien'],when:'!state.over',do:"despawn(a); despawn(b); state.score += 20; sound('hit'); repeat (4) spawn('spark', {x:b.x,y:b.y,vx:rand(-80,80),vy:rand(-80,80),data:{ttl:0.25}})"},
+  ...['bolt','alien'].map(tag=>({on:'hit',tags:['player',tag],when:'!state.over && state.inv <= 0',do:"despawn(b); state.lives -= 1; state.inv = 1.5; sound('lose'); if (state.lives <= 0) { state.over = true; spawn(null, {text:'SHIELDS DOWN',size:28,x:240,y:190,stroke:'#ff5d73',width:2,layer:10}) }"})),
+  {when:'state.over',do:"let e = all('alien'); repeat(count('alien')) { e[i].vx = 0; e[i].vy = 0 }; e = all('bolt'); repeat(count('bolt')) e[i].vy = 0"},
+  {when:"state.over && pressed('start')",do:"goto('play')"},
+  {do:"state.hud = 'SCORE ' + str(state.score) + '   SHIELDS ' + str(state.lives); let t = get('info'); if (t) t.text = state.over ? 'ENTER TO RETRY' : 'WAVE ' + str(state.wave) + '   SPACE FIRES   ARROWS MOVE'"}
+];
+writeFileSync('examples/pulse/pulse.json',JSON.stringify(d,null,2)+'\n');

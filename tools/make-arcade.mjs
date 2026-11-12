@@ -36,21 +36,8 @@ game('breaker','Breaker','Clear the neon wall. Move with arrows or A/D; space se
    r("let t = get('info'); if (t) t.text = 'LIVES ' + str(state.lives) + '   SPACE SERVES   ARROWS MOVE'")],
   ['motion','lifetime',{collideOutline:[['ball','brick']]},'rules']);
 
-game('pulse','Pulse','A formation shooter. Arrows or A/D move; hold space to fire. Clear waves, dodge return fire, protect three shields.',
-  {ship:path('M0 -14L15 10H5L0 5L-5 10H-15Z','#7df9ff'),alien:path('M-13 -6L-7 -12L-3 -6H3L7 -12L13 -6V6H8V11H3V5H-3V11H-8V6H-13Z','#b79aff'),shot:rect(3,12,'#ffcf5a'),bolt:rect(5,10,'#ff5d73'),spark:path('M-3 0H3M0 -3V3','none','#ffcf5a')},
-  {lives:3,wave:0,dir:1,inv:0,cool:0,fireT:1},[{id:'player',shape:'ship',x:240,y:320,tags:['player']},text('info','HOLD SPACE TO FIRE',352)], '',
-  [r("if (!state.over && count('alien') == 0 && state.scene == 'play') { state.wave += 1; state.dir = 1; repeat (24) { spawn('alien', {x: 70 + (i % 8) * 46, y: 60 + floor(i / 8) * 34, tags: ['alien'], fill: ['#b79aff','#ff7b9c','#7ee081'][floor(i / 8)]}) } }"),
-   each('player',[
-     "self.x = clamp(self.x + ((held('right') ? 1 : 0) - (held('left') ? 1 : 0)) * 270 * dt, 20, W - 20)",
-     "state.cool -= dt; state.inv = max(0, state.inv - dt); self.opacity = state.inv > 0 && floor(time * 14) % 2 == 0 ? 0.3 : 1",
-     "if (held('fire') && state.cool <= 0) { spawn('shot', {x: self.x, y: self.y - 18, vy: -420, tags: ['shot'], data: {ttl: 1}}); state.cool = 0.2 }"
-   ]),
-   r("if (!state.over) { let edge = false; let enemies = all('alien'); repeat (count('alien')) { let e = enemies[i]; if ((e.x > W - 25 && state.dir > 0) || (e.x < 25 && state.dir < 0)) edge = true }; if (edge) { state.dir = -state.dir; repeat (count('alien')) enemies[i].y += 12 }; state.fireT -= dt; if (state.fireT <= 0 && count('alien') > 0) { let e = enemies[floor(rand(0, count('alien')))]; spawn('bolt', {x: e.x, y: e.y + 14, vy: 155 + state.wave * 12, tags: ['bolt'], data: {ttl: 3}}); state.fireT = max(0.22, 0.9 - state.wave * 0.08) } }"),
-   each('alien',"self.x += state.dir * (22 + state.wave * 7) * dt; if (self.y > 286) state.over = true"),
-   on('hit',"despawn(a); despawn(b); state.score += 20; sound('hit'); repeat (4) spawn('spark', {x: b.x, y: b.y, vx: rand(-80,80), vy: rand(-80,80), data: {ttl: 0.25}})",{tags:['shot','alien'],when:'!state.over'}),
-   on('hit',"despawn(b); state.lives -= 1; state.inv = 1.2; sound('lose'); if (state.lives <= 0) state.over = true",{tags:['player','bolt'],when:'!state.over && state.inv <= 0'}),
-   r("if (state.over) { let e = all('shot'); repeat (count('shot')) e[i].vy = 0; e = all('bolt'); repeat (count('bolt')) e[i].vy = 0 }; let t = get('info'); if (t) t.text = 'WAVE ' + str(state.wave) + '   SHIELDS ' + str(state.lives)")],
-  ['motion','lifetime',{collideOutline:[['shot','alien'],['player','bolt']]},'rules']);
+// Pulse has its own formation authoring module.
+import './make-pulse.mjs';
 
 game('serpent','Serpent','A grid arcade snake. Arrows or WASD steer. Eat amber fruit, avoid the walls and your tail. Enter restarts.',
   {head:rect(14,14,'#7df9ff','#c8fcff'),tail:rect(12,12,'#348d95'),food:path('M0 -7L7 0L0 7L-7 0Z','#ffcf5a')},

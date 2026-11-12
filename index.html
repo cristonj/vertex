@@ -25,6 +25,7 @@
     .btn.primary { background: var(--accent); color: #06121a; border-color: var(--accent); }
     .btn:hover { text-decoration: none; filter: brightness(1.1); }
     .stage { position: relative; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: #0d0b1a; aspect-ratio: 4 / 3; }
+    .stage [hidden] { display: none; }
     .stage canvas { width: 100%; height: 100%; display: block; }
     .caption { margin: 8px 2px 0; font: 12px ui-monospace, monospace; color: var(--dim); }
     .facts { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
@@ -71,8 +72,8 @@
           <a class="btn" href="docs/tutorial.html">Tutorial</a>
         </div>
       </div>
-      <div><div class="stage"><canvas id="hero" width="960" height="720" aria-label="Starfall, played live by a scripted agent"></canvas></div>
-        <p class="caption">live: Starfall, rendered by Vertex and played by a 6-line policy</p></div>
+      <div><div class="stage"><canvas id="hero" width="960" height="720" tabindex="0" aria-label="Play Starfall with arrow keys or drag the basket"></canvas><button id="hero-start" class="btn primary" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);cursor:pointer">Play Starfall</button></div>
+        <p class="caption">Starfall: click Play, then use arrows or drag the basket. Enter retries. <a href="play.html?src=examples/starfall/starfall.json">Open full player</a></p></div>
     </section>
 
     <div class="facts">
@@ -86,16 +87,16 @@
     <p class="sub">Every game is a file you can read and fork. Sizes below measure the game source; gzip uses level 9. The shared engine, player and icons are extra. Press <span class="mono">`</span> in the player to inspect and edit it live.</p>
     <!-- GAMES:START -->
     <div class="games">
-      <a class="card" href="play.html?src=examples/apex/apex.json"><img src="examples/apex/icon.svg" alt="" width="56" height="56" loading="lazy"><b>Apex</b><span>Perspective racing. Sunset bends, traffic, boost and timed checkpoints.</span><small>Arrows drive · Space boosts</small><span class="meta" title="8,663 source bytes; 2,568 gzip bytes">8.5 KiB source · 2.5 KiB gzip</span></a>
+      <a class="card" href="play.html?src=examples/apex/apex.json"><img src="examples/apex/icon.svg" alt="" width="56" height="56" loading="lazy"><b>Apex</b><span>Coastal racing with smooth steering, near misses, boost and checkpoints.</span><small>Arrows drive · Space boosts</small><span class="meta" title="12,211 source bytes; 3,350 gzip bytes">11.9 KiB source · 3.3 KiB gzip</span></a>
       <a class="card" href="examples/drift/"><img src="examples/drift/icon.svg" alt="" width="56" height="56" loading="lazy"><b>Drift</b><span>The original vector space shooter, with outline collisions and time rewind.</span><small>Arrows fly · Space fires · R rewinds</small><span class="meta" title="3,265 source bytes; 1,422 gzip bytes">3.2 KiB source · 1.4 KiB gzip</span></a>
       <a class="card" href="play.html?src=examples/breaker/breaker.json"><img src="examples/breaker/icon.svg" alt="" width="56" height="56" loading="lazy"><b>Breaker</b><span>Clear a neon wall. Paddle placement controls the bounce. Three lives.</span><small>← → move · Space serves</small><span class="meta" title="4,158 source bytes; 1,500 gzip bytes">4.1 KiB source · 1.5 KiB gzip</span></a>
-      <a class="card" href="play.html?src=examples/pulse/pulse.json"><img src="examples/pulse/icon.svg" alt="" width="56" height="56" loading="lazy"><b>Pulse</b><span>Formation shooting, return fire, shields and increasingly fast waves.</span><small>← → move · Hold Space to fire</small><span class="meta" title="4,802 source bytes; 1,708 gzip bytes">4.7 KiB source · 1.7 KiB gzip</span></a>
+      <a class="card" href="play.html?src=examples/pulse/pulse.json"><img src="examples/pulse/icon.svg" alt="" width="56" height="56" loading="lazy"><b>Pulse</b><span>Four formations, diving attackers, return fire and escalating waves.</span><small>← → move · Hold Space to fire</small><span class="meta" title="8,471 source bytes; 2,706 gzip bytes">8.3 KiB source · 2.6 KiB gzip</span></a>
       <a class="card" href="play.html?src=examples/serpent/serpent.json"><img src="examples/serpent/icon.svg" alt="" width="56" height="56" loading="lazy"><b>Serpent</b><span>Grow a luminous snake. Each fruit speeds up the grid.</span><small>Arrows / WASD steer</small><span class="meta" title="4,329 source bytes; 1,486 gzip bytes">4.2 KiB source · 1.5 KiB gzip</span></a>
       <a class="card" href="play.html?src=examples/rally/rally.json"><img src="examples/rally/icon.svg" alt="" width="56" height="56" loading="lazy"><b>Rally</b><span>A paddle duel against a beatable CPU. First to seven takes the match.</span><small>↑ ↓ move · Space serves</small><span class="meta" title="4,365 source bytes; 1,416 gzip bytes">4.3 KiB source · 1.4 KiB gzip</span></a>
       <a class="card" href="play.html?src=examples/lunar/lunar.json"><img src="examples/lunar/icon.svg" alt="" width="56" height="56" loading="lazy"><b>Lunar</b><span>A fuel-limited lander. Control angle and velocity for a soft touchdown.</span><small>← → rotate · ↑ / Space thrust</small><span class="meta" title="4,057 source bytes; 1,484 gzip bytes">4.0 KiB source · 1.4 KiB gzip</span></a>
-      <a class="card" href="play.html?src=examples/starfall/starfall.json"><img src="examples/starfall/icon.svg" alt="" width="56" height="56" loading="lazy"><b>Starfall</b><span>Catch gold, dodge red, chain combos and collect shields.</span><small>← → move · Enter retries</small><span class="meta" title="7,283 source bytes; 2,111 gzip bytes">7.1 KiB source · 2.1 KiB gzip</span></a>
+      <a class="card" href="play.html?src=examples/starfall/starfall.json"><img src="examples/starfall/icon.svg" alt="" width="56" height="56" loading="lazy"><b>Starfall</b><span>Catch gold, dodge red. Play here or use the full player; keys and drag both work.</span><small>← → move · Enter retries</small><span class="meta" title="8,713 source bytes; 2,615 gzip bytes">8.5 KiB source · 2.6 KiB gzip</span></a>
       <a class="card" href="play.html?src=examples/ascent/ascent.json"><img src="examples/ascent/icon.svg" alt="" width="56" height="56" loading="lazy"><b>Ascent</b><span>Two platforming stages with variable jumps, gems and a summit.</span><small>← → move · Space jumps</small><span class="meta" title="9,965 source bytes; 2,014 gzip bytes">9.7 KiB source · 2.0 KiB gzip</span></a>
-      <a class="card" href="play.html?src=examples/skyline/skyline.json"><img src="examples/skyline/icon.svg" alt="" width="56" height="56" loading="lazy"><b>Skyline</b><span>A 3D city time trial. Collect six gems and dodge the buildings.</span><small>Arrows / WASD drive</small><span class="meta" title="11,053 source bytes; 1,995 gzip bytes">10.8 KiB source · 1.9 KiB gzip</span></a>
+      <a class="card" href="play.html?src=examples/skyline/skyline.json"><img src="examples/skyline/icon.svg" alt="" width="56" height="56" loading="lazy"><b>Skyline</b><span>A connected 3D city grid with parks, six gems and a live minimap.</span><small>Arrows / WASD drive</small><span class="meta" title="18,134 source bytes; 3,289 gzip bytes">17.7 KiB source · 3.2 KiB gzip</span></a>
       <a class="card" href="play.html?src=examples/frontier/frontier.json"><img src="examples/frontier/icon.svg" alt="" width="56" height="56" loading="lazy"><b>Frontier</b><span>Explore an endless forest, gather gold and talk to wanderers. Solo or online.</span><small>WASD explore · E talks</small><span class="meta" title="7,978 source bytes; 2,577 gzip bytes">7.8 KiB source · 2.5 KiB gzip</span></a>
     </div>
     <!-- GAMES:END -->
@@ -153,31 +154,26 @@ npx vertex-engine new mygame</pre>
     <footer><span>MIT licensed</span><a href="https://github.com/cristonj/vertex/blob/master/VISION.md">Vision</a><a href="https://github.com/cristonj/vertex/blob/master/SPEC.md">Spec</a><a href="https://github.com/cristonj/vertex/blob/master/README.md">Docs</a></footer>
   </div>
   <script type="module">
-    // The hero is a live Vertex game played by a tiny policy: chase the nearest star, avoid shards.
-    import { loadCartridge, CanvasRenderer } from './src/index.js';
+    import { loadCartridge, CanvasRenderer, createPlayer } from './src/index.js';
     const canvas = document.getElementById('hero');
+    const button = document.getElementById('hero-start');
     const doc = await (await fetch('examples/starfall/starfall.json')).json();
-    const renderer = new CanvasRenderer(canvas);
-    let game = loadCartridge(doc, { seed: 7 });
-    const policy = (g) => {
-      const p = g.world.get('player'); if (!p) return;
-      const star = g.world.query('star').sort((a, b) => b.y - a.y)[0];
-      const shard = g.world.query('shard').find((s) => s.y > 220 && Math.abs(s.x - p.x) < 40);
-      const target = shard ? p.x + (shard.x > p.x ? -60 : 60) : star ? star.x : p.x;
-      g.release('left'); g.release('right');
-      if (target < p.x - 6) g.press('left'); else if (target > p.x + 6) g.press('right');
-    };
-    let acc = 0, last = performance.now();
-    const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
-    requestAnimationFrame(function tick(now) {
-      acc += Math.min(0.25, (now - last) / 1000); last = now;
-      while (acc >= game.dt) {
-        acc -= game.dt; policy(game);
-        if (game.step(1).some((e) => e.type === 'gameover') || game.world.state.over) game = loadCartridge(doc, { seed: (Math.random() * 1e9) >>> 0 });
-      }
-      renderer.draw(game.world);
-      if (!reduce) requestAnimationFrame(tick);
+    const preview = loadCartridge(doc, { seed: 7 });
+    preview.step(120);
+    new CanvasRenderer(canvas).draw(preview.world);
+    let player;
+    button.addEventListener('click', async () => {
+      button.disabled = true;
+      try {
+        player = await createPlayer({ canvas, cartridge: doc, inspector: false, touch: false });
+        button.hidden = true;
+        canvas.focus({ preventScroll: true });
+      } catch (e) { button.textContent = 'Try again'; button.disabled = false; console.error(e); }
     });
+    // Leaving the play area pauses the round; clicking it resumes without an autopilot.
+    canvas.addEventListener('pointerdown', () => { player?.pause(false); canvas.focus({ preventScroll: true }); });
+    canvas.addEventListener('blur', () => player?.pause(true));
+    canvas.addEventListener('focus', () => player?.pause(false));
   </script>
 </body>
 </html>

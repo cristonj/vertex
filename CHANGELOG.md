@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Skyline: a connected city grid, parks, clear streets and a live minimap; generated from compact rules.
+- Pulse: arrowhead, diamond, twin-wing and orbit formations with ranked arrivals and diving attackers.
+- Starfall: playable front-page canvas, keyboard/drag controls, reliable basket catches and gentler difficulty progression.
+- Apex: smoother steering, consistent traffic depth, near-miss rewards, track regions and clearer race feedback.
 - Eleven-game arcade gallery with original SVG icons and measured source/gzip sizes, including Drift and Frontier.
 - New games: Apex (perspective highway racing), Breaker, Pulse, Serpent, Lunar and Rally.
 - Starfall: combos, shields, hearts, particles, outline collisions and restart. Ascent: clearer controls and summit restart.

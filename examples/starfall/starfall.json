@@ -1,7 +1,7 @@
 {
   "vertex": 1,
   "title": "Starfall",
-  "description": "Catch falling stars, dodge the shards, build a combo. A complete arcade game in one JSON file.",
+  "description": "Catch gold stars, avoid red shards. Move with arrows/A-D or drag the basket with mouse/touch. Collect shields and hearts. Enter or space retries.",
   "width": 480,
   "height": 360,
   "background": "#0a0816",
@@ -68,6 +68,12 @@
       "d": "M-2.5 0 H2.5 M0 -2.5 V2.5",
       "stroke": "#ffd166",
       "width": 1.5
+    },
+    "aura": {
+      "d": "M-35 0Q-35 -20 0 -20Q35 -20 35 0Q35 22 0 22Q-35 22 -35 0Z",
+      "fill": "none",
+      "stroke": "#7df9ff",
+      "width": 2
     }
   },
   "sounds": {
@@ -102,48 +108,30 @@
   },
   "state": {
     "score": 0,
-    "best": 0,
     "lives": 3,
     "combo": 1,
     "comboT": 0,
-    "speed": 95,
-    "st": 0,
+    "speed": 145,
+    "st": 0.45,
     "over": false,
     "shield": 0,
-    "hud": ""
+    "elapsed": 0,
+    "hud": "",
+    "best": 0
   },
   "keys": {
     "ArrowLeft": "left",
     "ArrowRight": "right",
     "a": "left",
     "d": "right",
-    "Enter": "start"
+    "Enter": "start",
+    " ": "start"
   },
   "systems": [
     "motion",
     "wrap",
     "particles",
     "lifetime",
-    {
-      "collideOutline": [
-        [
-          "player",
-          "star"
-        ],
-        [
-          "player",
-          "shard"
-        ],
-        [
-          "player",
-          "heart"
-        ],
-        [
-          "player",
-          "shield"
-        ]
-      ]
-    },
     "rules"
   ],
   "scenes": {
@@ -153,21 +141,63 @@
         "lives": 3,
         "combo": 1,
         "comboT": 0,
-        "speed": 95,
-        "st": 0,
+        "speed": 145,
+        "st": 0.45,
         "over": false,
         "shield": 0,
-        "elapsed": 0
+        "elapsed": 0,
+        "hud": ""
       },
       "entities": [
         {
           "id": "player",
           "shape": "cup",
           "x": 240,
-          "y": 330,
+          "y": 326,
           "tags": [
             "player"
-          ]
+          ],
+          "layer": 5
+        },
+        {
+          "id": "aura",
+          "shape": "aura",
+          "x": 240,
+          "y": 326,
+          "opacity": 0,
+          "layer": 4
+        },
+        {
+          "id": "score",
+          "text": "SCORE 0",
+          "x": 12,
+          "y": 22,
+          "size": 11,
+          "align": "left",
+          "stroke": "#ffcf5a",
+          "width": 1.5,
+          "layer": 10
+        },
+        {
+          "id": "status",
+          "text": "LIVES 3",
+          "x": 468,
+          "y": 22,
+          "size": 11,
+          "align": "right",
+          "stroke": "#7df9ff",
+          "width": 1.5,
+          "layer": 10
+        },
+        {
+          "id": "help",
+          "text": "ARROWS MOVE   OR DRAG THE BASKET",
+          "x": 240,
+          "y": 355,
+          "size": 9,
+          "stroke": "#7e759d",
+          "width": 1.1,
+          "layer": 10
         }
       ]
     }
@@ -186,29 +216,28 @@
       "each": "player",
       "when": "!state.over",
       "do": [
-        "if (held('left')) self.x = max(30, self.x - 330 * dt)",
-        "if (held('right')) self.x = min(W - 30, self.x + 330 * dt)",
-        "self.rot = self.rot + (((held('right') ? 1 : 0) - (held('left') ? 1 : 0)) * 0.12 - self.rot) * min(1, 15 * dt)"
+        "let dir = clamp(axis('x') + (held('right') ? 1 : 0) - (held('left') ? 1 : 0),-1,1); self.x = clamp(self.x + dir * 360 * dt,30,W-30)",
+        "if (held('pointer')) self.x = clamp(pointer.x,30,W-30); self.rot += (dir * 0.08-self.rot) * min(1,15*dt)",
+        "let a = get('aura'); a.x = self.x; a.opacity = state.shield > 0 ? 0.7+sin(time*8)*0.3 : 0"
       ]
     },
     {
-      "when": "!state.over",
+      "when": "!state.over && state.scene == 'play'",
       "do": [
-        "state.elapsed += dt",
-        "state.st -= dt",
-        "state.comboT = max(0, state.comboT - dt)",
-        "if (state.comboT <= 0 && state.combo > 1) state.combo = 1",
-        "if (state.shield > 0) state.shield -= dt",
-        "if (state.st <= 0) { let kind = random() < max(0.16, 0.7 - state.score / 400) ? 'star' : 'shard'; spawn(kind, {x: rand(24, W - 24), y: -16, vy: state.speed * rand(0.85, 1.25), vr: rand(-3, 3), tags: [kind, 'falling']}); state.st = max(0.3, 1.15 - state.score / 260) * rand(0.7, 1.2) }",
-        "if (random() < 0.0008) spawn('heart', {x: rand(30, W - 30), y: -16, vy: state.speed, tags: ['heart', 'falling'], vr: 1.5})",
-        "if (random() < 0.0012) spawn('shield', {x: rand(30, W - 30), y: -16, vy: state.speed, tags: ['shield', 'falling'], vr: -1.5})",
-        "state.speed += 2.2 * dt"
+        "state.elapsed += dt; state.st -= dt; state.comboT = max(0,state.comboT-dt)",
+        "if (state.comboT <= 0) state.combo = 1; state.shield = max(0,state.shield-dt)",
+        "if (state.st <= 0) { let kind = random() < max(0.5,0.78-state.elapsed*0.002) ? 'star' : 'shard'; spawn(kind, {x:rand(30,W-30),y:-16,vy:state.speed*rand(0.9,1.1),vr:rand(-1.8,1.8),tags:[kind,'falling']}); state.st = max(0.45,0.85-state.elapsed*0.004) * rand(0.85,1.15) }",
+        "if (random() < 0.0009) spawn('heart',{x:rand(30,W-30),y:-16,vy:state.speed,tags:['heart','falling']})",
+        "if (random() < 0.0014) spawn('shield',{x:rand(30,W-30),y:-16,vy:state.speed,tags:['shield','falling']})",
+        "state.speed = min(240,145+state.elapsed*1.2)"
       ]
     },
     {
       "each": "falling",
-      "when": "self.y > H + 24",
-      "do": "despawn(self)"
+      "when": "true",
+      "do": [
+        "if (state.over) { self.vy=0; self.vr=0 } else { let p = get('player'); if (p && self.y >= p.y-15 && self.y <= p.y+14 && abs(self.x-p.x) <= 30 && !self.data.caught) { self.data.caught = true; emit('hit',{a:p.id,b:self.id,tags:['player',has(self,'star') ? 'star' : (has(self,'shard') ? 'shard' : (has(self,'heart') ? 'heart' : 'shield'))]}) } }; if (self.y > H+24) despawn(self)"
+      ]
     },
     {
       "each": "bg",
@@ -222,10 +251,10 @@
       ],
       "when": "!state.over",
       "do": [
-        "despawn(b); state.combo = min(9, state.combo + 1); state.comboT = 2.2; state.score += 10 * state.combo; sound('ding')",
+        "despawn(b); state.score += 10 * state.combo; state.combo = min(5,state.combo+1); state.comboT = 4.5; sound('ding')",
         "spawn('spark', {x: b.x, y: b.y, vx: -60, vy: -40, data: {ttl: 0.3}})",
         "spawn('spark', {x: b.x, y: b.y, vx: 60, vy: -40, data: {ttl: 0.3}})",
-        "spawn(null, {text: '+' + str(10 * state.combo), size: 10, x: b.x, y: b.y - 8, stroke: '#ffd166', width: 1.5, vy: -40, data: {ttl: 0.7}})"
+        "spawn(null,{text:'NICE',size:10,x:b.x,y:b.y-12,stroke:'#ffd166',width:1.5,vy:-40,data:{ttl:0.5}})"
       ]
     },
     {
@@ -265,7 +294,7 @@
       "do": "goto('play')"
     },
     {
-      "do": "state.hud = 'SCORE ' + str(state.score) + '  LIVES ' + str(state.lives) + (state.combo > 1 ? '  X' + str(state.combo) : '') + (state.shield > 0 ? '  SHIELD' : '') + '  BEST ' + str(max(state.best, state.score))"
+      "do": "state.hud = ''; let s = get('score'); if (s) s.text = 'SCORE ' + str(state.score) + '  BEST ' + str(max(state.best,state.score)); s = get('status'); if (s) s.text = 'LIVES ' + str(state.lives) + (state.shield > 0 ? '  SHIELD' : (state.combo > 1 ? '  X' + str(state.combo) : '')); s = get('help'); if (s) s.text = state.over ? 'ENTER OR SPACE TO RETRY' : 'ARROWS MOVE   OR DRAG THE BASKET'"
     }
   ]
 }
