@@ -11,6 +11,7 @@ import { loadSceneModule, createFrom } from './load.js';
 import { Recorder, applyRecording, verifyReplay, digest } from './replay.js';
 import { toPNG } from './node.js';
 import { divergence } from './timeline.js';
+import { isCartridge, loadCartridge, encodeCartridge } from './cartridge.js';
 import { runMCPServer } from '../mcp/server.js';
 
 const OPTIONS = {
@@ -24,6 +25,7 @@ const OPTIONS = {
   json: { type: 'boolean' },
   at: { type: 'string' },
   width: { type: 'string' },
+  base: { type: 'string' },
 };
 
 const USAGE = `vertex — the vector-native, agent-first game engine
@@ -45,6 +47,9 @@ const USAGE = `vertex — the vector-native, agent-first game engine
       Replay two recordings of the same scene side by side and report the first frame
       where their worlds differ (compare two strategies, or bisect a desync).
 
+  vertex link <cartridge.json> [--base https://.../play.html]
+      Encode a single-file game as a shareable link. The whole game lives in the URL.
+
   vertex schema
       Print the JSON Schema for scene documents (schema/scene.schema.json).
 
@@ -58,6 +63,7 @@ export async function main(argv = process.argv.slice(2)) {
     if (cmd === 'run') await cmdRun(rest);
     else if (cmd === 'play') await cmdPlay(rest);
     else if (cmd === 'diff') await cmdDiff(rest);
+    else if (cmd === 'link') await cmdLink(rest);
     else if (cmd === 'schema') cmdSchema(rest);
     else if (cmd === 'mcp') runMCPServer();
     else {
@@ -144,6 +150,18 @@ async function cmdDiff(args) {
   const f = divergence((o) => createFrom(mod, o), a, b);
   if (f === null) console.log(`identical for all ${Math.min(a.steps, b.steps)} shared frames`);
   else console.log(`diverge at frame ${f}`);
+}
+
+async function cmdLink(args) {
+  const { positionals, values } = parseArgs({ args, options: OPTIONS, allowPositionals: true });
+  if (!positionals[0]) throw new Error('usage: vertex link <cartridge.json> [--base URL]');
+  const doc = JSON.parse(readFileSync(positionals[0], 'utf8'));
+  if (!isCartridge(doc)) throw new Error('not a cartridge (needs "rules" or "systems")');
+  loadCartridge(doc); // validate: scene + rules must compile
+  const code = await encodeCartridge(doc);
+  const base = values.base ?? 'https://cristonj.github.io/vertex/play.html';
+  console.log(`${base}#c=${code}`);
+  console.error(`${JSON.stringify(doc).length} bytes of JSON -> ${code.length} character link`);
 }
 
 function cmdSchema(args) {

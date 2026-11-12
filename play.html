@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Vertex Player</title>
+  <style>
+    :root { --bg: #0b0d12; --fg: #c8ccd4; --dim: #6b7280; --accent: #7df9ff; }
+    html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg); font: 14px/1.4 ui-monospace, monospace; }
+    body { display: grid; grid-template-rows: auto 1fr auto; }
+    header, footer { padding: 8px 16px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+    header b { color: var(--accent); }
+    main { display: grid; place-items: center; min-height: 0; padding: 0 16px; }
+    canvas { max-width: 100%; max-height: calc(100vh - 110px); background: #000; }
+    button { background: none; color: var(--fg); border: 1px solid var(--dim); border-radius: 4px; padding: 4px 10px; font: inherit; cursor: pointer; }
+    button:hover { border-color: var(--accent); }
+    .dim { color: var(--dim); }
+    #drop { display: none; position: fixed; inset: 0; background: #000a; place-items: center; font-size: 20px; }
+    body.dragging #drop { display: grid; }
+  </style>
+</head>
+<body>
+  <header>
+    <b>VERTEX</b><span id="title">no game loaded</span>
+    <span class="dim" id="size"></span>
+    <span style="flex:1"></span>
+    <button id="share" hidden>copy link</button>
+    <button id="open">open .json</button>
+  </header>
+  <main><canvas id="c" width="800" height="600"></canvas></main>
+  <footer class="dim"><span id="keys"></span><span>· hold R to rewind · drop or paste a cartridge JSON</span></footer>
+  <div id="drop">drop a Vertex cartridge</div>
+  <input type="file" id="file" accept=".json,application/json" hidden>
+  <script type="module">
+    // The universal player: any cartridge from a link (#c=...), a URL (?src=...), a file, or the clipboard.
+    import { loadCartridge, encodeCartridge, decodeCartridge, bindKeys, attachAudio, Timeline } from './src/index.js';
+    import { autoRenderer } from './src/webgl.js';
+
+    const $ = (id) => document.getElementById(id);
+    let stop = null;
+
+    async function start(doc) {
+      stop?.();
+      const canvas = $('c');
+      const dpr = Math.min(2, devicePixelRatio || 1);
+      canvas.width = (doc.width ?? 800) * dpr; canvas.height = (doc.height ?? 600) * dpr;
+      canvas.style.aspectRatio = `${doc.width ?? 800} / ${doc.height ?? 600}`;
+      canvas.style.width = `min(100%, ${doc.width ?? 800}px * 2)`;
+      $('title').textContent = doc.title ?? 'Untitled';
+      $('size').textContent = `${(JSON.stringify(doc).length / 1024).toFixed(1)} KB`;
+      $('keys').textContent = Object.entries(doc.keys ?? {}).map(([k, a]) => `${k.replace('Arrow', '')}: ${a}`).join(' · ');
+      document.title = `${doc.title ?? 'Untitled'} — Vertex`;
+
+      const timeline = new Timeline((o) => loadCartridge(doc, o), { seed: Date.now() >>> 0, every: 30 });
+      const unbind = bindKeys(timeline, doc.keys ?? {});
+      const unaudio = attachAudio(timeline.game);
+      const renderer = await autoRenderer(canvas);
+      let rewinding = false, raf = 0, acc = 0, last = performance.now();
+      const kd = (e) => { if (e.key === 'r') rewinding = true; }, ku = (e) => { if (e.key === 'r') rewinding = false; };
+      addEventListener('keydown', kd); addEventListener('keyup', ku);
+      const dt = timeline.game.dt;
+      const tick = (now) => {
+        acc += Math.min(0.25, (now - last) / 1000); last = now;
+        while (acc >= dt) {
+          acc -= dt;
+          if (rewinding) { timeline.game.muted = true; timeline.seek(timeline.frame - 2); timeline.game.muted = false; }
+          else timeline.step(1);
+        }
+        renderer.draw(timeline.game.world);
+        raf = requestAnimationFrame(tick);
+      };
+      raf = requestAnimationFrame(tick);
+      stop = () => { cancelAnimationFrame(raf); unbind(); unaudio(); removeEventListener('keydown', kd); removeEventListener('keyup', ku); };
+
+      const code = await encodeCartridge(doc);
+      $('share').hidden = false;
+      $('share').onclick = async () => {
+        const url = `${location.origin}${location.pathname}#c=${code}`;
+        await navigator.clipboard.writeText(url);
+        $('share').textContent = `copied (${url.length} chars)`;
+        setTimeout(() => ($('share').textContent = 'copy link'), 1500);
+      };
+    }
+
+    const fail = (e) => { $('title').textContent = `error: ${e.message}`; console.error(e); };
+    const fromText = (text) => { try { start(JSON.parse(text)).catch(fail); } catch (e) { fail(e); } };
+
+    $('open').onclick = () => $('file').click();
+    $('file').onchange = async () => { const f = $('file').files[0]; if (f) fromText(await f.text()); };
+    addEventListener('paste', (e) => { const t = e.clipboardData.getData('text'); if (t.trim().startsWith('{')) fromText(t); });
+    addEventListener('dragover', (e) => { e.preventDefault(); document.body.classList.add('dragging'); });
+    addEventListener('dragleave', () => document.body.classList.remove('dragging'));
+    addEventListener('drop', async (e) => {
+      e.preventDefault(); document.body.classList.remove('dragging');
+      const f = e.dataTransfer.files[0]; if (f) fromText(await f.text());
+    });
+
+    const hash = new URLSearchParams(location.hash.slice(1));
+    const src = new URLSearchParams(location.search).get('src');
+    if (hash.get('c')) decodeCartridge(hash.get('c')).then(start).catch(fail);
+    else fetch(src ?? 'examples/starfall/starfall.json').then((r) => r.json()).then(start).catch(fail);
+  </script>
+</body>
+</html>

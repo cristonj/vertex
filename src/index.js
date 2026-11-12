@@ -20,3 +20,5 @@ export { WebGLRenderer, autoRenderer } from './webgl.js';
 export { fanTriangles, strokeTriangles, coverQuad } from './tess.js';
 export { Timeline, divergence } from './timeline.js';
 export { Lockstep, memoryTransport, broadcastTransport, held } from './lockstep.js';
+export { compileRules, parse as parseRules } from './rules.js';
+export { loadCartridge, isCartridge, encodeCartridge, decodeCartridge } from './cartridge.js';
