@@ -20,7 +20,7 @@ const chrome = process.env.CHROME ?? 'C:/Program Files/Google/Chrome/Application
 const run = (url) => new Promise((done) => execFile(chrome, ['--headless=new', '--use-angle=swiftshader', '--enable-unsafe-swiftshader',
   '--virtual-time-budget=8000', '--dump-dom', url], { timeout: 60000 }, (err, out) => done(out || String(err))));
 let failed = 0;
-for (const src of ['examples/starfall/starfall.json', 'examples/ascent/ascent.json', 'conformance/cartridges/physics.json']) {
+for (const src of ['examples/starfall/starfall.json', 'examples/ascent/ascent.json', 'examples/skyline/skyline.json', 'examples/frontier/frontier.json', 'conformance/cartridges/physics.json']) {
   const dom = await run(`${base}/play.html?src=${src}`);
   const title = /<span id="title">([^<]*)<\/span>/.exec(dom)?.[1];
   const inspector = dom.includes('class="vx-dev"');

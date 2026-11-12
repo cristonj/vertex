@@ -35,6 +35,20 @@ share it with `node bin/vertex.js link game.json`.
 Keep cross-implementation determinism in mind (SPEC.md §8): `+ - * / sqrt floor` are exact
 everywhere; `sin/cos/atan2`, `drag` and arcs are only "visually identical" across runtimes.
 
+## 3D, huge worlds, dialogue, multiplayer (guides in docs/)
+- 3D: shapes with `mesh: {v, f}` or `extrude: {d, depth}`, a `space.camera`, entities with
+  `z/rx/ry/rz`; systems `motion3d`, `chase`, `collide3d`. y is down, z is forward. docs/3d.md.
+- Endless worlds: `streaming: {chunk, radius, focus}` + `"streaming"` first in systems; generate in
+  `{ "on": "chunkEnter", "when": "event.fresh", ... }` using `hash()`, `noise()` and
+  `repeat (n) { ... i ... }`, never `random()` (chunks must regenerate identically). docs/worlds.md.
+- Dialogue: `dialogue: { id: { start, nodes: { n: { speaker, text, choices: [{text, when, do, goto}], next } } } }`,
+  entities with `interact: { prompt, dialogue }`, systems `"interact"` and `"dialogue"`.
+- Multiplayer: add `multiplayer: { player: {...template}, spawn, interest }` and run
+  `vertex serve game.json`. Keep per-player values in the player entity's `data`, not `state`;
+  set `self.data.hud` for a per-player HUD. Single-player rules on the player tag just work.
+  docs/multiplayer.md.
+- New project: `npx vertex-engine new name --template platformer|topdown|3d|arcade`.
+
 ## Play-testing headless (Node, no browser)
 ```js
 const game = createMyGame({ seed: 1 });
@@ -80,6 +94,5 @@ over stdio. Session-scoped: `load` a scene (module path or inline JSON), then dr
 ## Conventions
 - Shapes: origin = pivot/center. Rotation 0 faces +x. Keep paths small; prefer `M/L/Q/C/Z`.
 - Tags drive systems (`wrap`, `rock`, `bullet`). Put game-specific numbers in `entity.data`.
-- `world.state` is for game-level values; `state.hud` is drawn as text by both renderers
-  (the PNG rasterizer skips text).
+- `world.state` is for game-level values; `state.hud` is drawn as text by every renderer.
 - Keep the core dependency-free. Run `node --test` before committing.

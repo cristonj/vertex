@@ -23,11 +23,17 @@ test('core entry is browser-safe: no node: imports reachable from src/index.js',
     seen.add(file);
     const src = readFileSync(new URL(`../src/${file}`, import.meta.url), 'utf8');
     assert.ok(!/from ['"]node:/.test(src), `${file} imports a Node built-in`);
-    for (const m of src.matchAll(/from '\.\/([\w.]+)'/g)) visit(m[1]);
+    const dir = file.includes('/') ? file.slice(0, file.lastIndexOf('/') + 1) : '';
+    for (const m of src.matchAll(/from '(\.{1,2}\/[\w./]+)'/g)) {
+      const parts = (dir + m[1]).split('/'), out = [];
+      for (const p of parts) { if (p === '.' || p === '') continue; if (p === '..') out.pop(); else out.push(p); }
+      visit(out.join('/'));
+    }
   };
   visit('index.js');
   visit('webgl.js');
-  assert.ok(seen.size > 10);
+  assert.ok(seen.size > 25, `only ${seen.size} modules visited`);
+  assert.ok(seen.has('net/client.js') && seen.has('player.js'));
   assert.ok(readdirSync(new URL('../src/', import.meta.url)).includes('node.js'));
 });
 

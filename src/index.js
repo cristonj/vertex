@@ -29,3 +29,6 @@ export { box, sphere, cylinder, plane, extrude, meshOf, projectSpace, projectPoi
 export { streaming, hash, noise, chunkKey, streamingStats } from './streaming.js';
 export { dialogue, interact, talk, wrap } from './dialogue.js';
 export { compileProgram, compileExpression, runInGame, interpolate } from './rules.js';
+export { createPlayer, gamepadRename } from './player.js';
+export { NetClient } from './net/client.js';
+export { GameServer, pipe } from './net/server.js';

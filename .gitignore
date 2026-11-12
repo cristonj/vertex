@@ -1,4 +1,4 @@
 node_modules/
 examples/**/last-frame.svg
-examples/**/replay-frame.svg
-examples/**/snap.png
+__pycache__/
+*.pyc

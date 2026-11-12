@@ -118,6 +118,7 @@ them, and whole genres explored by search.
 | **v0.5** (shipped) | Time | Save/load state, timelines with seek/rewind/branch, divergence finding, frame scrubbing, input-only lockstep multiplayer |
 | **v1.0** (shipped) | The format | [SPEC.md](SPEC.md), the rules language, single-file cartridges, games as links, a second implementation in Python that passes the conformance suite bit-for-bit |
 | **v1.1** (shipped) | Completeness | Deterministic physics and platforming, scenes, timers, particles, text entities, raycasts, pointer/gamepad/touch input, live inspector, TypeScript types, landing page, 2.7× faster rules |
+| **v2.0** (shipped) | Real work | Vector 3D, chunk-streamed endless worlds, branching dialogue and interactions, authoritative MMO-style server (interest management, deltas, dead reckoning), analog/touch/gamepad input, embeddable player, project scaffolding, npm package |
 | **Beyond** | Ecosystem | Prompt-to-game, a public registry of forkable games, an agent benchmark suite, runtime generative content, self-tuning games, 3D |
 
 ## Hard problems

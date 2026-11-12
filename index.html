@@ -78,7 +78,7 @@
       <div><b>~2 KB</b><small>a complete game, as JSON</small></div>
       <div><b>0</b><small>dependencies</small></div>
       <div><b>2</b><small>independent runtimes, bit-identical</small></div>
-      <div><b>10k</b><small>entities with exact collision, ~7 ms/step</small></div>
+      <div><b>500</b><small>players per server process, ~24k awake entities</small></div>
     </div>
 
     <h2>Games</h2>
@@ -86,6 +86,8 @@
     <div class="games">
       <a class="card" href="play.html"><b>Starfall</b>Catch stars, dodge shards. Spawning, scoring and difficulty are all rules.<span class="meta">cartridge · 2.3 KB</span></a>
       <a class="card" href="play.html?src=examples/ascent/ascent.json"><b>Ascent</b>A two-level platformer: physics, scenes, camera follow, particles, timers.<span class="meta">cartridge · 6 KB</span></a>
+      <a class="card" href="play.html?src=examples/skyline/skyline.json"><b>Skyline</b>3D drive through a vector city: meshes, extrusions, fog, chase camera.<span class="meta">cartridge · 3D · 4 KB</span></a>
+      <a class="card" href="play.html?src=examples/frontier/frontier.json"><b>Frontier</b>An endless procedural world with NPC dialogue. Also runs as an MMO server.<span class="meta">cartridge · streaming · multiplayer</span></a>
       <a class="card" href="examples/drift/"><b>Drift</b>Vector asteroids-style shooter written in JS. Hold R to rewind time.<span class="meta">JS module · outline collision</span></a>
     </div>
 
@@ -121,8 +123,11 @@ vertex link game.json
 <span class="k"># a second implementation, same frames</span>
 python py/vertex.py conform
 
-<span class="k"># let Claude play it over MCP</span>
-vertex mcp</pre>
+<span class="k"># serve it to hundreds of players</span>
+vertex serve game.json --root .
+
+<span class="k"># start a project</span>
+npx vertex-engine new mygame</pre>
     </div>
 
     <h2>What's inside</h2>
@@ -131,9 +136,9 @@ vertex mcp</pre>
       <div><b>Vectors everywhere</b><p>Full SVG path support, gradients, clipping, a built-in stroke font, procedural shapes, morphing. Rendered by WebGL2, Canvas2D, SVG or pure-JS PNG.</p></div>
       <div><b>Built for agents</b><p>Run headless, read JSON snapshots or SVG frames, drive named actions, and play over MCP. Agents can author, play-test and balance games.</p></div>
       <div><b>Time is data</b><p>Deterministic fixed-step simulation. Record, rewind, scrub, branch and diff any run. Multiplayer by exchanging inputs only.</p></div>
-      <div><b>Real game features</b><p>Physics with platforming, outline collision, raycasts, particles, scenes, timers, camera and layers, synthesized sound.</p></div>
+      <div><b>2D, 3D, huge worlds</b><p>Physics and platforming, vector 3D with shading and fog, endless streamed procedural worlds, branching dialogue and interactions.</p></div>
       <div><b>A format with a spec</b><p>SPEC.md defines every byte of the canonical frame. Two runtimes, 84 conformance digests, all identical.</p></div>
-      <div><b>Polished tooling</b><p>CLI, universal player with touch and gamepad, a live inspector with entity editing and hot reload, TypeScript types.</p></div>
+      <div><b>Multiplayer built in</b><p>An authoritative server with interest management, delta snapshots and dead reckoning. Single-player games become multiplayer without code changes.</p></div>
     </div>
 
     <footer><span>MIT licensed</span><a href="https://github.com/cristonj/vertex/blob/master/VISION.md">Vision</a><a href="https://github.com/cristonj/vertex/blob/master/SPEC.md">Spec</a><a href="https://github.com/cristonj/vertex/blob/master/README.md">Docs</a></footer>

@@ -56,6 +56,8 @@ export class NetClient {
       this.snapInterval = 1 / (m.sendRate ?? 20);
       this.game = new Game({ ...m.scene, entities: [], state: {} }, { fps: m.fps });
       this.world = this.game.world;
+      this.keys = m.scene.keys ?? {};
+      this.title = m.scene.title ?? null;
       this._ready(this);
     } else if (m.t === 'snap') this.apply(m);
     else if (m.t === 'error') { this._fail?.(new Error(m.message)); this.listeners.forEach((f) => f(m)); }
@@ -112,7 +114,10 @@ export class NetClient {
     }
     const me = this.me;
     if (me && this.world.camera && this.world.multiplayer?.follow !== false) { this.world.camera.x = me.x; this.world.camera.y = me.y; }
-    if (me) { dialogueUI(this.game, me.data?.dialogue ? me : null); promptUI(this.game, me); }
+    if (me) {
+      if (me.data?.hud != null) this.world.state.hud = me.data.hud; // per-player HUD
+      dialogueUI(this.game, me.data?.dialogue ? me : null); promptUI(this.game, me);
+    }
     this.flush();
     return this.world;
   }

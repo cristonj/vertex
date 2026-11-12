@@ -1,6 +1,9 @@
 # The Vertex Format — Specification 1.0
 
-Status: **1.1** (additive over 1.0: physics, scenes, timers, text entities, pointer input). The key words MUST, SHOULD and MAY are used as in RFC 2119.
+Status: **1.2**. Every revision since 1.0 is additive: documents that were valid before produce the
+same digests. 1.1 added physics, scenes, timers, text entities and pointer input; 1.2 adds chunk
+streaming, `repeat`, `hash`/`noise`, analog axes and per-player input (core), plus 3D, dialogue,
+interactions and the network protocol (extended). The key words MUST, SHOULD and MAY are used as in RFC 2119.
 
 Vertex is a format for games that are entirely text: vector art, scene, rules and input are JSON.
 This document defines the format precisely enough that independent implementations produce
@@ -20,10 +23,11 @@ checkpoints). An implementation is conformant at a level if it reproduces every 
 
 - **core** — everything needed to run cartridges headless and reproduce digests: the document
   model (§2), geometry (§3), world (§4), simulation (§5), rules (§6), systems `motion`, `wrap`,
-  `lifetime`, `collide`, `physics` (§7), the canonical SVG frame and digest (§9), recordings (§10).
-  Camera rotation is excluded.
-- **extended** — core plus `collideOutline`, `particles`, `follow`, `morph`, `keyframes`, camera
-  rotation, sound synthesis, rasterization and live renderers. Extended features are *implementation-tolerant*
+  `lifetime`, `collide`, `physics`, `streaming` (§7), the canonical SVG frame and digest (§9),
+  recordings (§10). Camera rotation is excluded.
+- **extended** — core plus `collideOutline`, `particles`, `follow`, `morph`, `keyframes`, 3D
+  (`space`, `motion3d`, `chase`, `collide3d`), `dialogue`, `interact`, camera rotation, sound
+  synthesis, rasterization, live renderers and the network protocol (§13). Extended features are *implementation-tolerant*
   (§8): their results MAY differ in the last bits between implementations.
 
 Versioning: documents carry `"vertex": 1`. Additive changes (new optional fields, builtins,
@@ -48,6 +52,10 @@ A **scene** is a JSON object. All fields are optional.
 | `physics` | `{gravity?: [gx, gy], iterations?, slop?}` | `[0, 900]`, 4, 0.01 | Settings for the `physics` system (§7.1) |
 | `scenes` | `{name: {entities, state?, camera?}}` | absent | Named levels/screens for `goto` (§5.1) |
 | `timers` | `[{at, type, ...}]` | `[]` | Pending timed events (§5.1); written by `after` |
+| `streaming` | `{chunk?, radius?, focus?, plane?, keep?}` | absent | Chunk streaming (§7.2); with `dormant`, `seenChunks`, `activeChunks` as its saved state |
+| `space` | `{camera, light?, ambient?, fog?}` | absent | 3D projection (extended, `src/space.js`) |
+| `dialogue` | `{id: {start?, nodes}}` | absent | Dialogue trees (extended, `src/dialogue.js`) |
+| `multiplayer` | `{player, spawn, interest, ...}` | absent | Server settings (extended, §13) |
 
 **Shape**: `{ d, fill?, stroke?, width?, clip? }` or `{ parts: Shape[] }`. `d` is SVG path data (§3).
 `fill` is a color string, `"none"`, or a gradient
@@ -137,6 +145,11 @@ Inline geometry has radius from its own `d` and pad `(width ?? 1) / 2`.
   `release(a)`: remove it from `held`. Input is applied between steps.
 - **Pointer**: a world-space point `{x, y}` (initially 0, 0) set by `point(x, y)`; its button is
   the ordinary action `"pointer"`.
+- **Axes**: analog values in [−1, 1] by name, set by `axis(name, v)` (0 removes the axis).
+- **Per-player input** (multiplayer): actions of player `P` are held as `"P:action"`, and the
+  pointer and axes are kept per player. While the rules system runs a rule for an entity whose
+  `data.player` is `P` (the `self` of `each`, or `a` of `hit`/`contact`), `held`, `pressed`, `axis`
+  and `pointer` read `P`'s input; otherwise the plain (single-player) input.
 - **Events**: `emit(type, payload)` appends `{ type, frame, ...payload }` (frame = current frame,
   before increment). Events emitted in a step are visible to later systems in the same step.
 - **RNG**: xorshift32 over an unsigned 32-bit state `s` (initial `seed >>> 0`, 0 replaced by 1):
@@ -152,7 +165,8 @@ Rules are an expression language with JavaScript value semantics restricted to J
 
 ```
 program  := stmt (';' stmt)*                 (a stmt ending in a block needs no ';')
-stmt     := 'if' '(' expr ')' body ('else' body)? | 'let' NAME '=' expr | target ASSIGN expr | expr
+stmt     := 'if' '(' expr ')' body ('else' body)? | 'repeat' '(' expr ')' body
+          | 'let' NAME '=' expr | target ASSIGN expr | expr
 body     := '{' program '}' | stmt
 ASSIGN   := '=' | '+=' | '-=' | '*=' | '/='          target := NAME | postfix-member
 expr     := or ('?' expr ':' expr)?
@@ -164,7 +178,8 @@ postfix  := primary ('.' NAME | '[' expr ']' | '(' args ')')*   (calls only on b
 primary  := NUMBER | STRING | true | false | null | NAME | '(' expr ')' | '[' items ']' | '{' fields '}'
 ```
 
-Strings use `'` or `"` with `\` escaping the next character. A rule's `do` is a program string or
+`repeat (n) body` runs `body` `floor(n)` times with local `i` = 0, 1, …; `n` above 10,000 is an
+error. Strings use `'` or `"` with `\` escaping the next character. A rule's `do` is a program string or
 an array of program strings joined with `;`. `when` is a single expression.
 
 ### 6.2 Semantics
@@ -204,6 +219,7 @@ an array of program strings joined with `;`. `when` is a single expression.
 `emit(type, payload?)`, `sound(name)` (emits `{type:"sound", name}`), `dist(a, b)`,
 `abs`, `min`, `max`, `floor`, `ceil`, `round(v) = floor(v + 0.5)`, `sqrt`, `sign`,
 `clamp(v, lo, hi)`, `lerp(a, b, t) = a + (b − a)·t`, `str(v)` (ToString), `len(v)` (0 for null),
+`axis(name)` (0 if unset), `hash(a, b, c)` (§7.2), `noise(x, y, seed)` (§7.2),
 `after(seconds, type, payload?)`, `goto(name)`, `nearest(x, y, tag)` (closest by squared
 distance, earliest on ties, or null), `burst(e, n)` (adds to `e.emitter.burst`),
 and the implementation-tolerant `sin`, `cos`, `atan2`, `at(x, y, tag?)` (topmost entity whose
@@ -219,6 +235,7 @@ outline contains the point) and `raycast(x, y, dx, dy, max?, tag?)` (`{entity, x
 | `collide: [[ta, tb], ...]` | for each pair in order, for each `a` in `query(ta)`, each `b` in `query(tb)`, `a ≠ b`: emit `hit {a: a.id, b: b.id, tags: [ta, tb]}` if `(ax−bx)² + (ay−by)² < (ra + rb)²` |
 | `collideOutline` (extended) | as `collide`, then only if transformed outlines intersect or contain each other |
 | `physics` | §7.1 |
+| `streaming` | §7.2 |
 | `particles` (extended) | emitters spawn particle entities (see `src/particles.js`) |
 | `follow: id \| {id, lerp}` (extended) | camera eases toward an entity: `k = 1 − (1 − lerp)^(60·dt)` (k = 1 when lerp ≥ 1) |
 | `rules` | §6 |
@@ -244,6 +261,27 @@ radius = local radius × |scale| centered at (x, y). One step:
    flags from the normal (`ny > 0.5` grounds a, `ny < −0.5` grounds b, `|nx| > 0.5` sets walls);
    if approaching (`vn < 0`), apply the normal impulse with `max(restitution)` and Coulomb friction
    with `sqrt(fa·fb)` clamped to `jn·μ`. Stop early when an iteration resolves no solid contact.
+
+### 7.2 Streaming
+
+With `streaming: {chunk = 512, radius = 1, focus = "player", plane = "xy", keep = []}`, each step:
+
+1. Active chunks are those within Chebyshev distance `radius` of the chunk of any entity tagged
+   `focus`; the chunk of a point is `(floor(x/chunk), floor(y/chunk))` (`y` is `z` when plane is
+   `"xz"`). Keys are the strings `"cx,cy"`.
+2. In entity order, every entity outside the active chunks — except `fixed` ones, focus entities,
+   and those with a `keep` tag — is appended (as a copy) to `dormant[key]` and despawned.
+3. For each chunk key entering the active set, in ascending (cx, cy) order: spawn its dormant
+   entities in order and delete the list; emit `chunkEnter {cx, cy, key, fresh, x: cx·chunk,
+   y: cy·chunk, size: chunk}` (`fresh` is true the first time; the key is then appended to
+   `seenChunks`). Then for each key leaving, ascending: emit `chunkLeave {cx, cy, key}`.
+4. `activeChunks` is the sorted active set.
+
+**hash(a, b, c)** maps integers (ToInt32) to [0, 1) with 32-bit wrapping arithmetic:
+`h = (imul(a, 374761393) + imul(b, 668265263) + imul(c, 2147483647)) | 0`;
+`h = imul(h ^ (h >>> 13), 1274126177)`; `h ^= h >>> 16`; result `(h >>> 0) / 2³²`.
+**noise(x, y, seed)** is bilinear interpolation of `hash` at the four surrounding integer points
+with smoothstep weights `s(t) = t²(3 − 2t)`: `a + (b − a)·sx + (c − a)·sy + (a − b − c + d)·sx·sy`.
 
 ## 8. Numeric determinism
 
@@ -331,7 +369,7 @@ Result: `h1` then `h2` as 8 lowercase hex digits each.
 { "vertex": 1, "scene": "path", "seed": 42, "fps": 60, "steps": 600, "digest": "…", "inputs": [[frame, "p"|"r", action], [frame, "m", x, y], …] }
 ```
 
-`"m"` entries are pointer moves (§5).
+`"m"` entries are pointer moves and `"a"` entries (`[frame, "a", axis, value]`) analog axes (§5).
 
 Replay: build the game with `seed` and `fps`; for `f = 0 … steps−1`, apply every input with
 frame `f` in order, then step. The final canonical frame's digest MUST equal `digest`.
@@ -348,3 +386,19 @@ The reference implementation additionally provides: Canvas2D and WebGL2 renderer
 rasterizer, outline collision, path morphing and keyframes, a procedural shape kit, camera
 rotation, synthesized sound (`sounds`) and note-string music, timelines (seek/branch), lockstep
 multiplayer, an MCP server and a CLI. Their observable outputs other than §9 are not normative.
+
+## 13. Network protocol (extended, informative)
+
+A server runs the authoritative simulation (`src/net/server.js`); clients send input and render
+snapshots. Messages are JSON text over WebSocket:
+
+- client → server: `{t: "hello", name}`, then `{t: "in", p?: [pressed], r?: [released], m?: [x, y], a?: {axis: v}}`.
+- server → client: `{t: "welcome", id, entity, fps, sendRate, scene}` where `scene` holds the static
+  document parts (shapes, sounds, dialogue, space, keys, …); then `{t: "snap", tick, frame, add?,
+  upd?, del?, gone?, state?}`: entities entering the client's interest radius (full), changed fields
+  of known entities, removed fields `[id, field…]`, entities that left, and changed `state` keys.
+- Players join as entities from `multiplayer.player` with `data.player = id`; `join`/`leave` events
+  are delivered at the start of the next step. Entities tagged `ui` or `particle` are never sent.
+- Positions are dead-reckoned: a moving entity's position is re-sent only when it deviates from its
+  last sent position plus velocity × elapsed time by more than `multiplayer.epsilon` (0.5), or its
+  velocity changes. Clients integrate velocities between snapshots.

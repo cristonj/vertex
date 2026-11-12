@@ -48,6 +48,7 @@
       isTouchDevice, attachAudio, Timeline } from './src/index.js';
     import { autoRenderer } from './src/webgl.js';
     import { mountInspector } from './src/devtools.js';
+    import { NetClient } from './src/net/client.js';
 
     const $ = (id) => document.getElementById(id);
     const canvas = $('c');
@@ -146,9 +147,41 @@
     addEventListener('dragleave', () => document.body.classList.remove('dragging'));
     addEventListener('drop', async (e) => { e.preventDefault(); document.body.classList.remove('dragging'); const f = e.dataTransfer.files[0]; if (f) fromText(await f.text()); });
 
+    // Online: ?server=ws://host:port/ws  (or ?server=auto when served by `vertex serve --root .`)
+    async function startNet(url, name) {
+      $('title').textContent = 'connecting…';
+      const client = await NetClient.connect(url, { name });
+      const doc = { ...client.world, keys: client.world.keys ?? {} };
+      const scene = client.game.world, W = scene.width, H = scene.height, dpr = Math.min(2, devicePixelRatio || 1);
+      canvas.width = W * dpr; canvas.height = H * dpr;
+      canvas.style.aspectRatio = `${W} / ${H}`;
+      canvas.style.width = `min(100%, ${W * 2}px, calc((100dvh - 96px) * ${W / H}))`;
+      const keys = client.keys ?? {};
+      $('title').textContent = `${client.title ?? 'online'} · ${client.id}`;
+      $('keys').textContent = Object.entries(keys).map(([k, a]) => `${k === ' ' ? 'space' : k.replace('Arrow', '')}: ${a}`).join(' · ');
+      const actions = [...new Set(Object.values(keys))];
+      bindKeys(client, keys);
+      bindPointer(client, canvas, () => client.world);
+      bindGamepad(client, { rename: gamepadRename(actions) });
+      if (isTouchDevice() && actions.length) touchControls(client, actions);
+      for (const id of ['pause', 'restart', 'share', 'dev', 'open']) $(id).hidden = true; // local-only controls
+      renderer ??= await autoRenderer(canvas);
+      let last = performance.now();
+      requestAnimationFrame(function tick(now) {
+        const dt = Math.min(0.1, (now - last) / 1000); last = now;
+        renderer.draw(client.frame(dt));
+        requestAnimationFrame(tick);
+      });
+      void doc;
+    }
+
     const hash = new URLSearchParams(location.hash.slice(1));
-    const src = new URLSearchParams(location.search).get('src');
-    if (hash.get('c')) decodeCartridge(hash.get('c')).then((d) => start(d)).catch(fail);
+    const params = new URLSearchParams(location.search);
+    const src = params.get('src');
+    let server = params.get('server');
+    if (server === 'auto') server = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`;
+    if (server) startNet(server, params.get('name') ?? localStorage.getItem?.('vx-name') ?? null).catch(fail);
+    else if (hash.get('c')) decodeCartridge(hash.get('c')).then((d) => start(d)).catch(fail);
     else fetch(src ?? 'examples/starfall/starfall.json').then((r) => r.text()).then(fromText).catch(fail);
   </script>
 </body>

@@ -23,8 +23,11 @@ export async function serve({ cartridge, port = 8080, host = '0.0.0.0', root = n
       return;
     }
     if (!base) { res.writeHead(404).end(); return; }
-    const file = normalize(join(base, path === '/' ? '/play.html' : path));
+    let rel = path === '/' ? '/index.html' : path;
+    // a project's index.html, else the engine's player; node_modules resolves for import maps
+    let file = normalize(join(base, rel));
     if (!file.startsWith(base)) { res.writeHead(403).end(); return; }
+    if (path === '/') { try { await readFile(file); } catch { file = normalize(join(base, '/play.html')); } }
     try {
       const body = await readFile(file);
       res.writeHead(200, { 'content-type': TYPES[extname(file)] ?? 'application/octet-stream' }).end(body);

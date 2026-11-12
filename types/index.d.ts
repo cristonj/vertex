@@ -11,7 +11,10 @@ export interface Gradient {
   stops: Array<[offset: number, color: Color]>;
 }
 export interface ShapePart { d: string; fill?: Color | Gradient; stroke?: Color; width?: number; clip?: string }
-export type Shape = ShapePart | { parts: ShapePart[] };
+export interface Mesh { v: Array<[number, number, number]>; f: number[][]; colors?: Color[] }
+export type Shape = ShapePart | { parts: ShapePart[] }
+  | { mesh: Mesh; fill?: Color; stroke?: Color; width?: number; shade?: boolean; doubleSided?: boolean }
+  | { extrude: { d: string; depth: number }; fill?: Color; stroke?: Color; width?: number; shade?: boolean };
 
 export interface Body {
   static?: boolean; sensor?: boolean; collider?: 'box' | 'circle';
@@ -36,6 +39,9 @@ export interface EntityDoc {
   x?: number; y?: number; rot?: number; scale?: number; vx?: number; vy?: number; vr?: number; drag?: number;
   layer?: number; parallax?: number; fixed?: boolean; hidden?: boolean;
   body?: Body; emitter?: Emitter;
+  /** 3D: depth position, Euler rotations (yaw = ry) and their velocities. */
+  z?: number; rx?: number; ry?: number; rz?: number; vz?: number; vrx?: number; vry?: number; vrz?: number;
+  interact?: { radius?: number; prompt?: string; dialogue?: string; do?: string | string[]; once?: boolean; disabled?: boolean; plane?: 'xy' | 'xz' };
   tags?: string[]; data?: Record<string, unknown>;
 }
 export interface Entity extends EntityDoc {
@@ -56,7 +62,17 @@ export interface SceneDoc {
   physics?: { gravity?: [number, number]; iterations?: number; slop?: number };
   scenes?: Record<string, { entities?: EntityDoc[]; state?: Record<string, any>; camera?: Camera }>;
   timers?: Array<{ at: number; type: string; [k: string]: unknown }>;
+  space?: { camera?: { x?: number; y?: number; z?: number; yaw?: number; pitch?: number; roll?: number; fov?: number; near?: number; far?: number }; light?: [number, number, number]; ambient?: number; fog?: { color: Color; near?: number; far?: number } };
+  streaming?: { chunk?: number; radius?: number; focus?: string; plane?: 'xy' | 'xz'; keep?: string[] };
+  dialogue?: Record<string, DialogueTree>;
+  dialogueStyle?: Partial<{ speed: number; size: number; margin: number; height: number; panel: Color; border: Color; textColor: Color; speakerColor: Color; choiceColor: Color; activeColor: Color }>;
+  interaction?: { focus?: string };
+  multiplayer?: { player?: EntityDoc; spawn?: { x?: number; y?: number; z?: number; spread?: number }; interest?: number; plane?: 'xy' | 'xz'; publicData?: string[]; sendRate?: number; maxPlayers?: number; epsilon?: number };
 }
+
+export interface DialogueChoice { text: string; when?: string; do?: string | string[]; goto?: string | null }
+export interface DialogueNode { speaker?: string; text?: string; do?: string | string[]; choices?: DialogueChoice[]; next?: string | null }
+export interface DialogueTree { start?: string; nodes: Record<string, DialogueNode> }
 
 export type Rule =
   | { do: string | string[]; when?: string; each?: string }
@@ -67,14 +83,17 @@ export type Rule =
 export type SystemRef =
   | 'rules' | 'motion' | 'wrap' | 'lifetime' | 'physics' | 'particles' | 'morph' | 'keyframes'
   | { collide: Array<[string, string]> } | { collideOutline: Array<[string, string]> }
-  | { follow: string | { id: string; lerp?: number } };
+  | { follow: string | { id: string; lerp?: number } }
+  | 'motion3d' | 'streaming' | 'dialogue' | 'interact'
+  | { collide3d: Array<[string, string]> }
+  | { chase: string | { id: string; distance?: number; height?: number; lerp?: number; pitch?: number } };
 
 export interface Cartridge extends SceneDoc {
   vertex?: 1; title?: string; description?: string;
   systems?: SystemRef[]; rules?: Rule[]; keys?: Record<string, string>;
 }
 
-export type Input = [frame: number, kind: 'p' | 'r', action: string] | [frame: number, kind: 'm', x: number, y: number];
+export type Input = [frame: number, kind: 'p' | 'r', action: string] | [frame: number, kind: 'm', x: number, y: number] | [frame: number, kind: 'a', axis: string, value: number];
 export interface Recording { vertex: 1; scene?: string; seed: number; fps: number; steps: number; digest: string; inputs: Input[] }
 
 export interface GameEvent { type: string; frame: number; [k: string]: any }
@@ -107,6 +126,9 @@ export class Game {
   world: World; dt: number; systems: System[];
   input: Set<string>; pressed: Set<string>; events: GameEvent[];
   pointer: { x: number; y: number };
+  axes: Record<string, number>;
+  /** True on a GameServer: cosmetic systems and UI are skipped. */
+  server?: boolean;
   muted?: boolean;
   cartridge?: { title: string; keys: Record<string, string> };
   random(): number;
@@ -118,6 +140,7 @@ export class Game {
   press(action: string): void;
   release(action: string): void;
   point(x: number, y: number): void;
+  axis(name: string, value: number): void;
   step(n?: number): GameEvent[];
   saveState(): SaveState;
   loadState(s: SaveState): this;
@@ -216,7 +239,7 @@ export function broadcastTransport(name?: string): Transport;
 export function held(game: Game, player: string, action: string): boolean;
 
 // input
-type Controllable = { press(a: string): void; release(a: string): void; point?(x: number, y: number): void };
+type Controllable = { press(a: string): void; release(a: string): void; point?(x: number, y: number): void; axis?(name: string, v: number): void };
 export function bindKeys(target: Controllable, map: Record<string, string>, el?: EventTarget): () => void;
 export function bindPointer(target: Controllable, canvas: HTMLCanvasElement, getWorld: () => World, opts?: { action?: string }): () => void;
 export function bindGamepad(target: Controllable, opts?: { buttons?: Record<number, string>; axes?: Record<number, [string, string]>; deadzone?: number; rename?: Record<string, string> }): () => void;
@@ -230,3 +253,56 @@ export function sequence(score: string, opts?: { bpm?: number; steps?: number; v
 export function noteFreq(name: string): number;
 export function toWAV(samples: Float32Array, sampleRate?: number): Uint8Array;
 export function attachAudio(game: Game, opts?: { volume?: number }): () => void;
+
+// 3D
+export function box(w?: number, h?: number, d?: number): Mesh;
+export function sphere(r?: number, rings?: number, segs?: number): Mesh;
+export function cylinder(r?: number, h?: number, segs?: number): Mesh;
+export function plane(w?: number, d?: number, nx?: number, nz?: number, height?: ((x: number, z: number) => number) | null): Mesh;
+export function extrude(d: string, depth?: number): Mesh;
+export interface ProjectedFace { id: string; d: string; fill: Color; stroke?: Color; width?: number; depth: number; layer: number; pts: number[][]; tris: number[]; rgb: number[] }
+export function projectSpace(world: World): ProjectedFace[];
+export function projectPoint(world: World, x: number, y: number, z: number): [number, number, number] | null;
+export const motion3d: System;
+export function chaseCamera(id: string, opts?: { distance?: number; height?: number; lerp?: number; pitch?: number }): System;
+export function collide3d(pairs: Array<[string, string]>): System;
+
+// huge worlds
+export const streaming: System;
+export function hash(a?: number, b?: number, c?: number): number;
+export function noise(x: number, y: number, seed?: number): number;
+export function streamingStats(world: World): { awake: number; sleeping: number; activeChunks: number; seenChunks: number };
+
+// dialogue & interaction
+export const dialogue: System;
+export const interact: System;
+export function talk(game: Game, id: string, opts?: { who?: string | null; actor?: Entity | string | null; node?: string | null }): void;
+export function wrap(text: string, cols: number): string[];
+
+// multiplayer
+export interface Connection { send(text: string): void; on(ev: 'message' | 'close', fn: (...a: any[]) => void): void; close?(): void }
+export class GameServer {
+  constructor(cartridge: Cartridge, opts?: { seed?: number; fps?: number });
+  game: Game; clients: Map<string, unknown>; tick: number;
+  stats: { bytesOut: number; messagesOut: number; lastSnapshotBytes: number };
+  connect(conn: Connection): unknown;
+  step(): GameEvent[];
+}
+export function pipe(): [Connection, Connection];
+export class NetClient {
+  constructor(socket: unknown);
+  static connect(url: string, opts?: { name?: string | null; connect?: (url: string) => Promise<unknown> }): Promise<NetClient>;
+  id: string | null; entityId: string | null; game: Game | null; world: World | null; keys: Record<string, string>; title: string | null;
+  readonly me: Entity | null;
+  frame(dt?: number): World | null;
+  press(a: string): void; release(a: string): void; point(x: number, y: number): void; axis(name: string, v: number): void; flush(): void;
+}
+export interface Player {
+  mode: 'local' | 'online'; readonly world: World; title?: string | null; keys: Record<string, string>;
+  timeline?: Timeline; client?: NetClient; readonly paused?: boolean;
+  pause(p?: boolean): void; restart(): void; setMuted(m: boolean): void; destroy(): void;
+}
+export function createPlayer(opts: {
+  canvas: HTMLCanvasElement; cartridge?: Cartridge | null; server?: string | null; name?: string | null; seed?: number;
+  inspector?: boolean; touch?: boolean | 'auto'; audio?: boolean; fit?: boolean; keys?: Record<string, string>; onEvent?: (e: GameEvent) => void;
+}): Promise<Player>;

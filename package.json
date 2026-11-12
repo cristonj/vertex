@@ -1,17 +1,41 @@
 {
   "name": "vertex-engine",
-  "version": "1.1.0",
-  "description": "A vector-native, agent-first game format and engine. Everything is SVG paths and JSON; a whole game fits in a link.",
+  "version": "2.0.0",
+  "description": "A vector-native, agent-first game engine and format: 2D and 3D games as tiny JSON documents, deterministic replays, huge streamed worlds, dialogue, and MMO-style multiplayer. Zero dependencies.",
   "type": "module",
   "main": "src/index.js",
   "types": "types/index.d.ts",
-  "bin": { "vertex": "bin/vertex.js" },
+  "bin": {
+    "vertex": "bin/vertex.js"
+  },
   "exports": {
-    ".": { "types": "./types/index.d.ts", "default": "./src/index.js" },
-    "./node": { "types": "./types/index.d.ts", "default": "./src/node.js" },
+    ".": {
+      "types": "./types/index.d.ts",
+      "default": "./src/index.js"
+    },
+    "./node": {
+      "types": "./types/index.d.ts",
+      "default": "./src/node.js"
+    },
     "./mcp": "./mcp/server.js"
   },
-  "files": ["src", "bin", "mcp", "schema", "types", "play.html", "SPEC.md", "conformance", "py"],
+  "files": [
+    "src",
+    "bin",
+    "mcp",
+    "schema",
+    "types",
+    "docs",
+    "examples/*/*.json",
+    "examples/*/*.js",
+    "examples/*/*.html",
+    "play.html",
+    "SPEC.md",
+    "AGENTS.md",
+    "CHANGELOG.md",
+    "conformance/cartridges",
+    "py"
+  ],
   "scripts": {
     "test": "node --test",
     "play:agent": "node examples/drift/agent-play.js",
@@ -20,9 +44,42 @@
     "bench": "node bench/bench.js",
     "conform": "python py/vertex.py conform",
     "test:browser": "node tools/browser/run.mjs",
-    "serve": "npx --yes serve ."
+    "serve": "npx --yes serve .",
+    "prepublishOnly": "node --test && python py/vertex.py conform"
   },
-  "engines": { "node": ">=20.11" },
-  "keywords": ["game-engine", "vector", "svg", "agents", "llm", "mcp", "canvas", "png", "replay", "deterministic", "2d"],
-  "license": "MIT"
+  "engines": {
+    "node": ">=20.11"
+  },
+  "keywords": [
+    "2d",
+    "3d",
+    "agents",
+    "canvas",
+    "deterministic",
+    "dialogue",
+    "engine",
+    "game",
+    "game-engine",
+    "gamedev",
+    "llm",
+    "mcp",
+    "mmo",
+    "multiplayer",
+    "physics",
+    "png",
+    "procedural",
+    "replay",
+    "svg",
+    "vector",
+    "websocket"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cristonj/vertex.git"
+  },
+  "homepage": "https://cristonj.github.io/vertex/",
+  "bugs": {
+    "url": "https://github.com/cristonj/vertex/issues"
+  }
 }
