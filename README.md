@@ -18,7 +18,7 @@ A complete game fits in a link. Humans and AI agents drive it through the same A
 
 ```bash
 git clone https://github.com/cristonj/vertex && cd vertex
-node --test                                         # engine tests (Node 18.3+)
+node --test                                         # engine tests (Node 20.11+)
 node bin/vertex.js run examples/starfall/starfall.json --steps 600 --svg frame.svg
 python py/vertex.py conform                         # the Python runtime passes the conformance suite
 npm run serve                                       # then open http://localhost:3000/play.html

@@ -17,7 +17,7 @@
     "test:browser": "node tools/browser/run.mjs",
     "serve": "npx --yes serve ."
   },
-  "engines": { "node": ">=18.3" },
+  "engines": { "node": ">=20.11" },
   "keywords": ["game-engine", "vector", "svg", "agents", "llm", "mcp", "canvas", "png", "replay", "deterministic", "2d"],
   "license": "MIT"
 }
