@@ -321,6 +321,10 @@ class World:
         self.physics = doc.get('physics')
         self.scenes = doc.get('scenes')
         self.timers = json.loads(json.dumps(doc.get('timers') or []))
+        self.streaming = doc.get('streaming')
+        self.dormant = json.loads(json.dumps(doc.get('dormant') or {})) if doc.get('streaming') else None
+        self.seen_chunks = list(doc.get('seenChunks') or []) if doc.get('streaming') else None
+        self.active_chunks = list(doc.get('activeChunks') or []) if doc.get('streaming') else None
         self.entities = []
         self.by_id = {}
         self.time = 0.0
@@ -394,7 +398,8 @@ class World:
 # --------------------------------------------------------------------------- rules
 
 RULE_TOKEN = re.compile(r"""\s*(?:(\d+\.?\d*(?:[eE][-+]?\d+)?|\.\d+(?:[eE][-+]?\d+)?)|('(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*")|([A-Za-z_$][\w$]*)|(\+=|-=|\*=|/=|==|!=|<=|>=|&&|\|\||[-+*/%<>=!?:;.,()\[\]{}]))""")
-KEYWORDS = {'if', 'else', 'let', 'true', 'false', 'null'}
+KEYWORDS = {'if', 'else', 'let', 'repeat', 'true', 'false', 'null'}
+REPEAT_LIMIT = 10000
 FORBIDDEN = {'__proto__', 'prototype', 'constructor'}
 
 
@@ -452,7 +457,7 @@ def parse_rules(src):
             if i[0] < len(toks) and not (end and peek(end)):
                 if peek(';'):
                     i[0] += 1
-                elif body[-1][0] != 'if':
+                elif body[-1][0] not in ('if', 'repeat'):
                     eat(';')
         return ('block', body)
 
@@ -468,6 +473,10 @@ def parse_rules(src):
                 i[0] += 1
                 other = block() if peek('{') else ('block', [stmt()])
             return ('if', cond, then, other)
+        if peek_name('repeat'):
+            i[0] += 1; eat('('); count = expr(); eat(')')
+            body = block() if peek('{') else ('block', [stmt()])
+            return ('repeat', count, body)
         if peek_name('let'):
             i[0] += 1; name = at(); i[0] += 1
             if not name or name[0] != 'name':
@@ -585,6 +594,13 @@ def run_stmt(node, env):
             run_stmt(node[3], env)
     elif k == 'let':
         env['locals'][node[1]] = ev(node[2], env)
+    elif k == 'repeat':
+        n = math.floor(arith(ev(node[1], env)))
+        if not (n <= REPEAT_LIMIT):
+            raise RuleError('rules: repeat count %s exceeds %d' % (n, REPEAT_LIMIT))
+        for kk in range(int(n)):
+            env['locals']['i'] = float(kk)
+            run_stmt(node[2], env)
     elif k == 'assign':
         _, op, target, value = node
         v = ev(value, env)
@@ -760,6 +776,9 @@ def builtins(game):
 
     return {
         'held': lambda a: a in game.input,
+        'axis': lambda n: game.axes.get(n, 0),
+        'hash': lambda a=0, b=0, c=0: hash3(a, b, c),
+        'noise': lambda x, y, seed=0: noise2(x, y, seed),
         'pressed': lambda a: a in game.pressed,
         'random': game.random,
         'rand': lambda lo, hi: lo + game.random() * (hi - lo),
@@ -1116,9 +1135,86 @@ def sys_particles(game, dt):
             w.spawn(dict((k, v) for k, v in fields.items() if v is not None or k == 'shape'))
 
 
+def _i32(v):
+    v = int(math.trunc(v)) if isinstance(v, float) else int(v)
+    v &= 0xffffffff
+    return v - 0x100000000 if v & 0x80000000 else v
+
+
+def _imul(a, b):
+    return _i32((a & 0xffffffff) * (b & 0xffffffff))
+
+
+def hash3(a=0, b=0, c=0):
+    # Mirrors src/streaming.js hash(): 32-bit integer arithmetic, identical in every runtime.
+    h = _i32(_imul(_i32(a), 374761393) + _imul(_i32(b), 668265263) + _imul(_i32(c), 2147483647))
+    h = _imul(h ^ ((h & 0xffffffff) >> 13), 1274126177)
+    h ^= (h & 0xffffffff) >> 16
+    return (h & 0xffffffff) / 4294967296
+
+
+def noise2(x, y, seed=0):
+    x0, y0 = math.floor(x), math.floor(y)
+    fx, fy = x - x0, y - y0
+    sx, sy = fx * fx * (3 - 2 * fx), fy * fy * (3 - 2 * fy)
+    a, b = hash3(x0, y0, seed), hash3(x0 + 1, y0, seed)
+    c, d = hash3(x0, y0 + 1, seed), hash3(x0 + 1, y0 + 1, seed)
+    return a + (b - a) * sx + (c - a) * sy + (a - b - c + d) * sx * sy
+
+
+def _key_sort(k):
+    a, b = k.split(',')
+    return (int(a), int(b))
+
+
+def sys_streaming(game, dt):
+    w = game.world
+    st = w.streaming
+    if not st:
+        return
+    chunk, radius = st.get('chunk', 512), st.get('radius', 1)
+    focus, plane, keep = st.get('focus', 'player'), st.get('plane', 'xy'), st.get('keep') or []
+    coord = (lambda e: (e['x'], e.get('z', 0))) if plane == 'xz' else (lambda e: (e['x'], e['y']))
+    if w.dormant is None: w.dormant = {}
+    if w.seen_chunks is None: w.seen_chunks = []
+    if w.active_chunks is None: w.active_chunks = []
+    key = lambda cx, cy: '%d,%d' % (cx, cy)
+    active = set()
+    for f in w.query(focus):
+        x, y = coord(f)
+        cx, cy = math.floor(x / chunk), math.floor(y / chunk)
+        for dx in range(-radius, radius + 1):
+            for dy in range(-radius, radius + 1):
+                active.add(key(cx + dx, cy + dy))
+    for e in list(w.entities):
+        if e.get('fixed') or focus in e['tags'] or any(t in e['tags'] for t in keep):
+            continue
+        x, y = coord(e)
+        k = key(math.floor(x / chunk), math.floor(y / chunk))
+        if k in active:
+            continue
+        w.dormant.setdefault(k, []).append(json.loads(json.dumps(e)))
+        w.despawn(e)
+    before, seen = set(w.active_chunks), set(w.seen_chunks)
+    for k in sorted([k for k in active if k not in before], key=_key_sort):
+        sleeping = w.dormant.pop(k, None)
+        if sleeping:
+            for e in sleeping:
+                w.spawn(e)
+        cx, cy = _key_sort(k)
+        game.emit('chunkEnter', {'cx': cx, 'cy': cy, 'key': k, 'fresh': k not in seen, 'x': cx * chunk, 'y': cy * chunk, 'size': chunk})
+        if k not in seen:
+            seen.add(k)
+            w.seen_chunks.append(k)
+    for k in sorted([k for k in before if k not in active], key=_key_sort):
+        cx, cy = _key_sort(k)
+        game.emit('chunkLeave', {'cx': cx, 'cy': cy, 'key': k})
+    w.active_chunks = sorted(active, key=_key_sort)
+
+
 SYSTEMS = {'motion': lambda _: sys_motion, 'wrap': lambda _: sys_wrap, 'lifetime': lambda _: sys_lifetime,
            'collide': sys_collide, 'physics': lambda _: sys_physics, 'follow': sys_follow,
-           'particles': lambda _: sys_particles}
+           'particles': lambda _: sys_particles, 'streaming': lambda _: sys_streaming}
 
 
 # --------------------------------------------------------------------------- game
@@ -1132,11 +1228,18 @@ class Game:
         self.seed = (int(seed) & 0xffffffff) or 1
         self.initial_seed = self.seed
         self.pointer = {'x': 0, 'y': 0}
+        self.axes = {}
         self.pending_scene = None
 
     def point(self, x, y):
         self.pointer['x'] = x
         self.pointer['y'] = y
+
+    def axis(self, name, value):
+        if value:
+            self.axes[name] = value
+        else:
+            self.axes.pop(name, None)
 
     def after(self, seconds, typ, payload=None):
         t = {'at': self.world.time + seconds, 'type': typ}
@@ -1428,6 +1531,8 @@ def apply_input(game, inp):
         game.release(inp[2])
     elif inp[1] == 'm':
         game.point(inp[2], inp[3])
+    elif inp[1] == 'a':
+        game.axis(inp[2], inp[3])
 
 
 def apply_recording(game, rec):

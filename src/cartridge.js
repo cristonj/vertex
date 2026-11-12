@@ -23,6 +23,8 @@ import { physics } from './physics.js';
 import { particles } from './particles.js';
 import { follow } from './view.js';
 import { motion3d, chaseCamera, collide3d } from './space.js';
+import { streaming } from './streaming.js';
+import { dialogue, interact } from './dialogue.js';
 
 const FACTORIES = {
   motion: () => systems.motion,
@@ -35,6 +37,9 @@ const FACTORIES = {
   physics: () => physics,
   particles: () => particles,
   motion3d: () => motion3d,
+  streaming: () => streaming,
+  dialogue: () => dialogue,
+  interact: () => interact,
   chase: (arg) => (typeof arg === 'string' ? chaseCamera(arg) : chaseCamera(arg.id, arg)),
   collide3d: (pairs) => collide3d(pairs),
   follow: (arg) => (typeof arg === 'string' ? follow(arg) : follow(arg.id, arg.lerp ?? 1)),

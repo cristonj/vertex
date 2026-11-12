@@ -32,7 +32,14 @@ export class World {
     this.physics = doc.physics ? structuredClone(doc.physics) : undefined;
     this.scenes = doc.scenes ? structuredClone(doc.scenes) : undefined;
     this.timers = structuredClone(doc.timers ?? []);
-    this.space = doc.space ? structuredClone(doc.space) : undefined;   // [{ at, type, ...payload }], fired by Game.step
+    this.space = doc.space ? structuredClone(doc.space) : undefined;
+    this.dialogue = doc.dialogue ? structuredClone(doc.dialogue) : undefined;
+    this.dialogueStyle = doc.dialogueStyle ? { ...doc.dialogueStyle } : undefined;
+    this.interaction = doc.interaction ? { ...doc.interaction } : undefined;
+    this.streaming = doc.streaming ? structuredClone(doc.streaming) : undefined;
+    this.dormant = doc.dormant ? structuredClone(doc.dormant) : undefined;           // sleeping chunks
+    this.seenChunks = doc.seenChunks ? [...doc.seenChunks] : undefined;
+    this.activeChunks = doc.activeChunks ? [...doc.activeChunks] : undefined;   // [{ at, type, ...payload }], fired by Game.step
     this._byId = new Map();
     this.time = 0;
     this.frame = 0;
@@ -104,6 +111,10 @@ export class World {
       ...(this.scenes ? { scenes: this.scenes } : {}),
       ...(this.timers.length ? { timers: this.timers } : {}),
       ...(this.space ? { space: this.space } : {}),
+      ...(this.dialogue ? { dialogue: this.dialogue } : {}),
+      ...(this.dialogueStyle ? { dialogueStyle: this.dialogueStyle } : {}),
+      ...(this.interaction ? { interaction: this.interaction } : {}),
+      ...(this.streaming ? { streaming: this.streaming, dormant: this.dormant ?? {}, seenChunks: this.seenChunks ?? [], activeChunks: this.activeChunks ?? [] } : {}),
       shapes: Object.fromEntries(Object.entries(this.shapes).map(([k, v]) => [k, v.src])),
       entities: this.entities.map((e) => ({ ...e })),
       state: this.state,

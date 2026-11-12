@@ -26,6 +26,8 @@ const OPTIONS = {
   at: { type: 'string' },
   width: { type: 'string' },
   base: { type: 'string' },
+  port: { type: 'string' },
+  root: { type: 'string' },
 };
 
 const USAGE = `vertex — the vector-native, agent-first game engine
@@ -50,6 +52,13 @@ const USAGE = `vertex — the vector-native, agent-first game engine
   vertex link <cartridge.json> [--base https://.../play.html]
       Encode a single-file game as a shareable link. The whole game lives in the URL.
 
+  vertex serve <cartridge.json> [--port 8080] [--root .] [--seed N]
+      Run an authoritative multiplayer server for a cartridge (WebSocket on /ws, status on
+      /status). With --root, also serves the browser player: open http://host:port/?server=auto
+
+  vertex new <name> [--template platformer|topdown|3d|multiplayer]
+      Scaffold a new game project (cartridge, player page, package.json, AGENTS.md).
+
   vertex schema
       Print the JSON Schema for scene documents (schema/scene.schema.json).
 
@@ -64,6 +73,8 @@ export async function main(argv = process.argv.slice(2)) {
     else if (cmd === 'play') await cmdPlay(rest);
     else if (cmd === 'diff') await cmdDiff(rest);
     else if (cmd === 'link') await cmdLink(rest);
+    else if (cmd === 'serve') await cmdServe(rest);
+    else if (cmd === 'new') await cmdNew(rest);
     else if (cmd === 'schema') cmdSchema(rest);
     else if (cmd === 'mcp') runMCPServer();
     else {
@@ -150,6 +161,22 @@ async function cmdDiff(args) {
   const f = divergence((o) => createFrom(mod, o), a, b);
   if (f === null) console.log(`identical for all ${Math.min(a.steps, b.steps)} shared frames`);
   else console.log(`diverge at frame ${f}`);
+}
+
+async function cmdServe(args) {
+  const { positionals, values } = parseArgs({ args, options: OPTIONS, allowPositionals: true });
+  if (!positionals[0]) throw new Error('usage: vertex serve <cartridge.json> [--port 8080] [--root DIR]');
+  const doc = JSON.parse(readFileSync(positionals[0], 'utf8'));
+  const { serve } = await import('./net/serve.js');
+  await serve({ cartridge: doc, port: num(values.port) ?? 8080, root: values.root ?? null, seed: num(values.seed) ?? (Date.now() >>> 0) });
+}
+
+async function cmdNew(args) {
+  const { positionals, values } = parseArgs({ args, options: { ...OPTIONS, template: { type: 'string', short: 't' } }, allowPositionals: true });
+  const { scaffold } = await import('./scaffold.js');
+  const dir = scaffold(positionals[0], { template: values.template ?? 'platformer' });
+  console.log(`created ${dir}
+  cd ${positionals[0]} && npm install && npm start`);
 }
 
 async function cmdLink(args) {

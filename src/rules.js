@@ -1,3 +1,5 @@
+import { hash as hash3, noise as noise2 } from './streaming.js';
+import { talk as import_talk } from './dialogue.js';
 import { raycast as castRay, nearest as nearestTo, pointQuery } from './physics.js';
 // Vertex Rules: game logic as data. A tiny, safe, deterministic expression language so a
 // complete game — art, scene AND behavior — is one JSON document that any implementation
@@ -36,7 +38,8 @@ export function tokenize(src) {
   return out;
 }
 
-const KEYWORDS = new Set(['if', 'else', 'let', 'true', 'false', 'null']);
+const KEYWORDS = new Set(['if', 'else', 'let', 'repeat', 'true', 'false', 'null']);
+export const REPEAT_LIMIT = 10000;
 
 export function parse(src) {
   const toks = tokenize(src);
@@ -53,7 +56,7 @@ export function parse(src) {
       body.push(stmt());
       if (i < toks.length && !(end && peek(end))) {
         if (peek(';')) i++;
-        else if (body[body.length - 1].k !== 'if') eat(';');
+        else if (body[body.length - 1].k !== 'if' && body[body.length - 1].k !== 'repeat') eat(';');
       }
     }
     return { k: 'block', body };
@@ -66,6 +69,11 @@ export function parse(src) {
       let other = null;
       if (peekName('else')) { i++; other = peek('{') ? block() : { k: 'block', body: [stmt()] }; }
       return { k: 'if', cond, then, other };
+    }
+    if (peekName('repeat')) {
+      i++; eat('('); const count = expr(); eat(')');
+      const body = peek('{') ? block() : { k: 'block', body: [stmt()] };
+      return { k: 'repeat', count, body };
     }
     if (peekName('let')) {
       i++; const name = toks[i++]; if (name?.t !== 'name') throw new SyntaxError('rules: let needs a name');
@@ -165,6 +173,7 @@ let LETS = new Set();
 function letsOf(node, out = new Set()) {
   if (!node || typeof node !== 'object') return out;
   if (node.k === 'let') out.add(node.name);
+  if (node.k === 'repeat') out.add('i');
   for (const v of Object.values(node)) {
     if (Array.isArray(v)) v.forEach((x) => letsOf(x, out)); else if (v && typeof v === 'object') letsOf(v, out);
   }
@@ -262,6 +271,14 @@ function compileStmt(node) {
       return (env) => { if (c(env)) t(env); else if (o) o(env); };
     }
     case 'let': { const name = node.name, v = compileExpr(node.value); return (env) => { env.locals[name] = v(env); }; }
+    case 'repeat': {
+      const count = compileExpr(node.count), body = compileStmt(node.body);
+      return (env) => {
+        const n = Math.floor(count(env));
+        if (!(n <= REPEAT_LIMIT)) throw new Error(`rules: repeat count ${n} exceeds ${REPEAT_LIMIT}`);
+        for (let k = 0; k < n; k++) { env.locals.i = k; body(env); }
+      };
+    }
     case 'assign': {
       const v = compileExpr(node.value), op = node.op;
       const apply = (cur, x) => (op === '=' ? x : op === '+=' ? cur + x : op === '-=' ? cur - x : op === '*=' ? cur * x : cur / x);
@@ -294,8 +311,10 @@ function builtins(game) {
   const w = () => game.world;
   const ent = (x) => (typeof x === 'string' ? w().get(x) : x);
   return {
-    held: (a) => game.input.has(a),
-    pressed: (a) => game.pressed.has(a),
+    // input reads the current owner's namespace in multiplayer ("p3:left"); plain names otherwise
+    held: (a) => game.input.has(game._owner != null ? `${game._owner}:${a}` : a),
+    axis: (name) => (game._owner != null ? game.axesBy?.[game._owner]?.[name] : game.axes[name]) ?? 0,
+    pressed: (a) => game.pressed.has(game._owner != null ? `${game._owner}:${a}` : a),
     random: () => game.random(),
     rand: (lo, hi) => lo + game.random() * (hi - lo),
     spawn: (shape, fields = {}) => w().spawn({ shape, ...fields }),
@@ -325,6 +344,10 @@ function builtins(game) {
       const h = castRay(w(), x, y, dx, dy, { max: max ?? Infinity, tag: tag ?? null });
       return h ? { entity: h.entity, x: h.x, y: h.y, distance: h.distance } : null;
     },
+    hash: (a, b, c) => hash3(a, b, c),
+    noise: (x, y, seed) => noise2(x, y, seed ?? 0),
+    talk: (id, who, actor) => import_talk(game, id, { who: who ? (typeof who === 'string' ? who : who.id) : null, actor: actor ?? game._ownerEntity ?? null }),
+    inDialogue: (actor) => !!((actor ?? game._ownerEntity)?.data?.dialogue ?? game.world.state.dialogue),
     burst: (e, n) => { e = ent(e); if (e?.emitter) e.emitter.burst = (e.emitter.burst ?? 0) + n; },
     len: (v) => (v == null ? 0 : v.length),
   };
@@ -360,7 +383,9 @@ export function compileRules(rules) {
       r._do(env);
     };
     const exec = (r, extra) => {
-      env.vars = extra ? { ...vars, ...extra } : vars;
+      const who = extra?.a ?? extra?.self ?? null;
+      setOwner(game, who?.data?.player != null ? who : null);
+      env.vars = extra ? { ...vars, ...extra, pointer: ownerPointer(game) } : vars;
       env.locals = {};
       if (r._when && !r._when(env)) return;
       r._do(env);
@@ -388,9 +413,54 @@ export function compileRules(rules) {
       }
       if (r.each) {
         const scope = { ...vars, self: null }; // one flat scope per rule; `self` rebound per entity
-        for (const self of w.query(r.each)) if (w.get(self.id) === self) { scope.self = self; run(r, scope); }
+        for (const self of w.query(r.each)) if (w.get(self.id) === self) {
+          scope.self = self;
+          setOwner(game, self.data?.player != null ? self : null);
+          scope.pointer = ownerPointer(game);
+          run(r, scope);
+        }
+        setOwner(game, null);
       }
-      else exec(r, null);
+      else { setOwner(game, null); exec(r, null); }
     }
   };
+}
+
+function setOwner(game, entity) { game._ownerEntity = entity; game._owner = entity ? entity.data.player : null; }
+const ownerPointer = (game) => (game._owner != null ? game.pointers?.[game._owner] ?? { x: 0, y: 0 } : game.pointer);
+
+/** Run fn with input read from `owner`'s namespace (multiplayer), restoring afterwards. */
+export function withOwner(game, owner, fn) {
+  const prev = [game._owner, game._ownerEntity];
+  game._owner = owner; game._ownerEntity = owner != null ? game.world.query('player').find((p) => p.data?.player === owner) ?? null : null;
+  try { return fn(); } finally { [game._owner, game._ownerEntity] = prev; }
+}
+
+/** Compile a statement program (string) or expression (string) for use outside rule arrays. */
+export function compileProgram(src) { const ast = parse(src); return withLets(ast, compileStmt); }
+export function compileExpression(src) { const ast = parseExpr(src); return withLets(ast, compileExpr); }
+
+/**
+ * Run compiled programs/expressions against a game with the same bindings rules get
+ * (dt, frame, state, W, H, pointer, camera, builtins), plus `extra` bindings.
+ */
+export function runInGame(game, fn, extra = {}, dt = game.dt) {
+  const w = game.world;
+  let fns = builtinCache.get(game);
+  if (!fns) builtinCache.set(game, (fns = builtins(game)));
+  const vars = { dt, frame: w.frame, time: w.time, state: w.state, W: w.width, H: w.height, PI: Math.PI, pointer: game.pointer, camera: w.camera ?? null, ...extra };
+  return fn({ vars, locals: {}, fns });
+}
+
+/** Expand `{expr}` placeholders in text using rule expressions (compiled once per string). */
+const templateCache = new Map();
+export function interpolate(game, text, extra) {
+  if (!text.includes('{')) return text;
+  let parts = templateCache.get(text);
+  if (!parts) {
+    parts = text.split(/(\{[^{}]+\})/).map((p) => (p.startsWith('{') && p.endsWith('}') ? compileExpression(p.slice(1, -1)) : p));
+    if (templateCache.size > 2000) templateCache.clear();
+    templateCache.set(text, parts);
+  }
+  return parts.map((p) => (typeof p === 'string' ? p : String(runInGame(game, p, extra)))).join('');
 }

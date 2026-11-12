@@ -26,3 +26,6 @@ export { physics, contact, raycast, pointQuery, nearest } from './physics.js';
 export { particles } from './particles.js';
 export { inlineD, inlineStyle } from './world.js';
 export { box, sphere, cylinder, plane, extrude, meshOf, projectSpace, projectPoint, motion3d, chaseCamera, collide3d, radius3d } from './space.js';
+export { streaming, hash, noise, chunkKey, streamingStats } from './streaming.js';
+export { dialogue, interact, talk, wrap } from './dialogue.js';
+export { compileProgram, compileExpression, runInGame, interpolate } from './rules.js';

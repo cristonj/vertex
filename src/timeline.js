@@ -33,6 +33,11 @@ export class Timeline {
   /** Input that also truncates the future (acting in the past starts a new timeline). */
   press(action) { this._truncate(); if (!this.game.input.has(action)) this.inputs.push([this.frame, 'p', action]); this.game.press(action); }
   release(action) { this._truncate(); if (this.game.input.has(action)) this.inputs.push([this.frame, 'r', action]); this.game.release(action); }
+  axis(name, v) {
+    this._truncate();
+    if ((this.game.axes[name] ?? 0) !== (v || 0)) this.inputs.push([this.frame, 'a', name, v || 0]);
+    this.game.axis(name, v);
+  }
   point(x, y) {
     this._truncate();
     if (x !== this.game.pointer.x || y !== this.game.pointer.y) this.inputs.push([this.frame, 'm', x, y]);

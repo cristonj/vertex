@@ -22,6 +22,7 @@ const pick = (game, r, dflt) => {
 };
 
 export function particles(game, dt) {
+  if (game.server) return; // cosmetic: network clients emit locally from the synced emitters
   const w = game.world;
   // age existing particles (shrink + gravity)
   for (const p of w.entities) {

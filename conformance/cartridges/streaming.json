@@ -1,0 +1,31 @@
+{
+  "vertex": 1,
+  "title": "Conformance: streaming, procedural generation, analog input",
+  "description": "Core-level: chunk streaming, chunkEnter generation with hash/noise/repeat, sleeping and waking entities, analog axes. No trig, no pow.",
+  "width": 320, "height": 240, "background": "#000",
+  "camera": { "x": 160, "y": 120 },
+  "streaming": { "chunk": 200, "radius": 1, "focus": "player" },
+  "shapes": {
+    "dot": { "d": "M-3 -3 H3 V3 H-3 Z", "fill": "#6c6" },
+    "gem": { "d": "M0 -5 L5 0 L0 5 L-5 0 Z", "fill": "#fc0" },
+    "me": { "d": "M-6 -6 H6 V6 H-6 Z", "fill": "#fff" }
+  },
+  "entities": [ { "id": "me", "shape": "me", "x": 100, "y": 100, "tags": ["player"], "data": { "got": 0 } } ],
+  "state": { "made": 0, "enters": 0, "leaves": 0, "hud": "" },
+  "keys": { "ArrowLeft": "left", "ArrowRight": "right", "ArrowUp": "up", "ArrowDown": "down" },
+  "systems": ["streaming", "rules", "motion", { "collide": [["player", "gem"]] }],
+  "rules": [
+    { "on": "chunkEnter", "do": "state.enters += 1" },
+    { "on": "chunkLeave", "do": "state.leaves += 1" },
+    { "on": "chunkEnter", "when": "event.fresh", "do": [
+      "repeat (3 + floor(hash(event.cx, event.cy, 1) * 5)) { let px = event.x + hash(event.cx, event.cy, 10 + i) * event.size; let py = event.y + hash(event.cx, event.cy, 30 + i) * event.size; spawn(noise(px / 90, py / 90, 7) > 0.5 ? 'gem' : 'dot', {x: px, y: py, tags: [noise(px / 90, py / 90, 7) > 0.5 ? 'gem' : 'dot']}); state.made += 1 }"
+    ] },
+    { "each": "player", "do": [
+      "self.vx = (axis('x') + (held('right') ? 1 : 0) - (held('left') ? 1 : 0)) * 220",
+      "self.vy = (axis('y') + (held('down') ? 1 : 0) - (held('up') ? 1 : 0)) * 220",
+      "camera.x = self.x; camera.y = self.y"
+    ] },
+    { "on": "hit", "tags": ["player", "gem"], "do": "despawn(b); a.data.got += 1" },
+    { "do": "state.hud = 'GOT ' + str(first('player').data.got) + ' MADE ' + str(state.made) + ' E' + str(state.enters) + ' L' + str(state.leaves) + ' N' + str(count('dot') + count('gem'))" }
+  ]
+}

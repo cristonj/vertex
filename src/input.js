@@ -68,14 +68,19 @@ export function bindGamepad(target, { buttons = GAMEPAD_DEFAULTS.buttons, axes =
   const name = (a) => rename[a] ?? a;
   const poll = () => {
     const want = new Set();
+    let ax = 0, ay = 0;
     for (const pad of globalThis.navigator?.getGamepads?.() ?? []) {
       if (!pad) continue;
+      if (Math.abs(pad.axes[0] ?? 0) > 0.12) ax = pad.axes[0];
+      if (Math.abs(pad.axes[1] ?? 0) > 0.12) ay = pad.axes[1];
       for (const [i, a] of Object.entries(buttons)) if (pad.buttons[i]?.pressed) want.add(name(a));
       for (const [i, [neg, pos]] of Object.entries(axes)) {
         const v = pad.axes[i] ?? 0;
         if (v < -deadzone) want.add(name(neg)); else if (v > deadzone) want.add(name(pos));
       }
     }
+    const q = (v) => Math.round(v * 20) / 20; // quantized: compact replays, no jitter spam
+    target.axis?.('x', q(ax)); target.axis?.('y', q(ay));
     for (const a of want) if (!held.has(a)) { held.add(a); target.press(a); }
     for (const a of [...held]) if (!want.has(a)) { held.delete(a); target.release(a); }
     raf = requestAnimationFrame(poll);
@@ -92,7 +97,7 @@ const GLYPH = { up: '▲', down: '▼', left: '◀', right: '▶' };
  * actions, round buttons for the rest. Returns a remove function. Uses pointer events, so
  * multi-touch works (hold left + jump).
  */
-export function touchControls(target, actions, parent = document.body) {
+export function touchControls(target, actions, parent = document.body, { stick = true } = {}) {
   const uniq = [...new Set(actions)].filter((a) => a !== 'pointer');
   const dirs = DIRS.filter((d) => uniq.includes(d));
   const rest = uniq.filter((a) => !DIRS.includes(a)).slice(0, 4);
@@ -118,16 +123,56 @@ export function touchControls(target, actions, parent = document.body) {
     b.addEventListener('pointercancel', off); b.addEventListener('lostpointercapture', off);
     return b;
   };
-  const pad = document.createElement('div');
-  pad.className = 'pad';
-  const pos = { up: '1 / 2', left: '2 / 1', right: '2 / 3', down: '3 / 2' };
-  for (const d of dirs) pad.append(make(d, GLYPH[d], `grid-area: ${pos[d]}`));
+  let pad;
+  if (stick && (dirs.includes('left') || dirs.includes('right'))) pad = joystick(target, dirs);
+  else {
+    pad = document.createElement('div');
+    pad.className = 'pad';
+    const pos = { up: '1 / 2', left: '2 / 1', right: '2 / 3', down: '3 / 2' };
+    for (const d of dirs) pad.append(make(d, GLYPH[d], `grid-area: ${pos[d]}`));
+  }
   const btns = document.createElement('div');
   btns.className = 'btns';
   for (const a of rest) btns.append(make(a, a.slice(0, 5).toUpperCase()));
   root.append(pad, btns);
   parent.append(root);
   return () => root.remove();
+}
+
+/**
+ * Analog virtual joystick: sets axes x/y in [-1, 1] and presses the matching direction actions
+ * past a threshold, so analog and digital games both just work.
+ */
+function joystick(target, dirs, { size = 128, threshold = 0.4 } = {}) {
+  const el = document.createElement('div');
+  el.style.cssText = `pointer-events:auto;touch-action:none;width:${size}px;height:${size}px;border-radius:50%;border:1.5px solid #ffffff55;background:#ffffff10;position:relative`;
+  const knob = document.createElement('div');
+  knob.style.cssText = `position:absolute;left:50%;top:50%;width:${size * 0.42}px;height:${size * 0.42}px;margin:-${size * 0.21}px 0 0 -${size * 0.21}px;border-radius:50%;background:#ffffff40;border:1.5px solid #ffffff88`;
+  el.append(knob);
+  const held = new Set();
+  const set = (x, y) => {
+    const q = (v) => Math.round(v * 20) / 20;
+    target.axis?.('x', q(x)); target.axis?.('y', q(y));
+    knob.style.transform = `translate(${x * size * 0.3}px, ${y * size * 0.3}px)`;
+    const want = new Set();
+    if (x < -threshold && dirs.includes('left')) want.add('left');
+    if (x > threshold && dirs.includes('right')) want.add('right');
+    if (y < -threshold && dirs.includes('up')) want.add('up');
+    if (y > threshold && dirs.includes('down')) want.add('down');
+    for (const a of want) if (!held.has(a)) { held.add(a); target.press(a); }
+    for (const a of [...held]) if (!want.has(a)) { held.delete(a); target.release(a); }
+  };
+  const move = (ev) => {
+    const r = el.getBoundingClientRect();
+    let x = (ev.clientX - (r.left + r.width / 2)) / (r.width / 2), y = (ev.clientY - (r.top + r.height / 2)) / (r.height / 2);
+    const l = Math.hypot(x, y); if (l > 1) { x /= l; y /= l; }
+    set(x, y);
+  };
+  el.addEventListener('pointerdown', (ev) => { ev.preventDefault(); el.setPointerCapture?.(ev.pointerId); move(ev); });
+  el.addEventListener('pointermove', (ev) => { if (el.hasPointerCapture?.(ev.pointerId)) move(ev); });
+  const stop = () => set(0, 0);
+  el.addEventListener('pointerup', stop); el.addEventListener('pointercancel', stop); el.addEventListener('lostpointercapture', stop);
+  return el;
 }
 
 /** True on devices whose primary input is touch. */

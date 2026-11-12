@@ -70,25 +70,43 @@ export function physics(game, dt) {
   }
   if (bodies.length < 2) return;
   const reported = new Set();
-  // Broadphase: uniform grid over collider AABBs (cell = 2x median-ish size), pairs in index order.
+  // Broadphase: bodies that cannot move during the solve (static, sensor) are gridded once per
+  // step; movers are re-gridded each iteration. Candidate pairs (i < j) are visited in
+  // lexicographic order: exactly the order of the all-pairs loop in SPEC.md §7.1.
+  const fixedIdx = [], moverIdx = [];
+  bodies.forEach((e, i) => (e.body.static || e.body.sensor ? fixedIdx : moverIdx).push(i));
+  if (!moverIdx.length) return; // only fixed bodies: every pair is skipped anyway
+  const cols = new Array(bodies.length);
+  for (const i of fixedIdx) cols[i] = collider(w, bodies[i]);
+  let cell = 16;
+  for (const i of moverIdx) { const c = collider(w, bodies[i]); cell = Math.max(cell, c.x1 - c.x0, c.y1 - c.y0); }
+  for (const i of fixedIdx) { const c = cols[i]; const sz = Math.max(c.x1 - c.x0, c.y1 - c.y0); if (sz > cell && sz < 4096) cell = sz; }
+  const inv = 1 / cell, keyOf = (cx, cy) => cx * 73856093 ^ cy * 19349663;
+  const insert = (grid, i, c) => {
+    for (let cx = Math.floor(c.x0 * inv); cx <= Math.floor(c.x1 * inv); cx++)
+      for (let cy = Math.floor(c.y0 * inv); cy <= Math.floor(c.y1 * inv); cy++) {
+        const k = keyOf(cx, cy); const l = grid.get(k); if (l) l.push(i); else grid.set(k, [i]);
+      }
+  };
+  const fixedGrid = new Map();
+  for (const i of fixedIdx) insert(fixedGrid, i, cols[i]);
   for (let it = 0; it < iterations; it++) {
-    const cols = bodies.map((e) => collider(w, e));
-    let cell = 0;
-    for (const c of cols) cell = Math.max(cell, c.x1 - c.x0, c.y1 - c.y0);
-    cell = Math.max(16, cell);
-    const grid = new Map();
-    const keyOf = (cx, cy) => cx * 73856093 ^ cy * 19349663;
-    cols.forEach((c, i) => {
-      for (let cx = Math.floor(c.x0 / cell); cx <= Math.floor(c.x1 / cell); cx++)
-        for (let cy = Math.floor(c.y0 / cell); cy <= Math.floor(c.y1 / cell); cy++) {
-          const k = keyOf(cx, cy); const l = grid.get(k); if (l) l.push(i); else grid.set(k, [i]);
+    for (const i of moverIdx) cols[i] = collider(w, bodies[i]);
+    const moverGrid = new Map();
+    for (const i of moverIdx) insert(moverGrid, i, cols[i]);
+    const pairSet = new Set();
+    const addPairs = (i, c, grid) => {
+      for (let cx = Math.floor(c.x0 * inv); cx <= Math.floor(c.x1 * inv); cx++)
+        for (let cy = Math.floor(c.y0 * inv); cy <= Math.floor(c.y1 * inv); cy++) {
+          const l = grid.get(keyOf(cx, cy));
+          if (l) for (const j of l) if (j !== i) pairSet.add(i < j ? i * 1048576 + j : j * 1048576 + i);
         }
-    });
-    const pairs = new Set();
-    for (const l of grid.values()) for (let p = 0; p < l.length; p++) for (let q = p + 1; q < l.length; q++) pairs.add(l[p] * 65536 + l[q]);
+    };
+    for (const i of moverIdx) { addPairs(i, cols[i], moverGrid); addPairs(i, cols[i], fixedGrid); }
+    const pairs = [...pairSet].sort((a, b) => a - b);
     let any = false;
-    for (const key of [...pairs].sort((a, b) => a - b)) {
-      const i = Math.floor(key / 65536), j = key % 65536;
+    for (const key of pairs) {
+      const i = Math.floor(key / 1048576), j = key % 1048576;
       const a = bodies[i], b = bodies[j], ba = a.body, bb = b.body;
       if ((ba.static || ba.sensor) && (bb.static || bb.sensor)) continue;
       const c = contact(cols[i], cols[j]);

@@ -15,6 +15,7 @@ function script(actions, seed, frames, pointer, size) {
   const held = new Set();
   for (let f = 0; f < frames; f++) {
     if (pointer && rnd() < 0.05) log.push([f, 'm', Math.floor(rnd() * size[0]), Math.floor(rnd() * size[1])]);
+    if (rnd() < 0.03) log.push([f, 'a', rnd() < 0.5 ? 'x' : 'y', Math.round((rnd() * 2 - 1) * 20) / 20]);
     if (rnd() < 0.06) {
       const a = actions[Math.floor(rnd() * actions.length)];
       if (held.has(a)) { held.delete(a); log.push([f, 'r', a]); } else { held.add(a); log.push([f, 'p', a]); }
@@ -29,6 +30,7 @@ const cartridges = [
   ['conformance/cartridges/torture.json', 'core'],
   ['examples/starfall/starfall.json', 'core'],
   ['conformance/cartridges/physics.json', 'core'],
+  ['conformance/cartridges/streaming.json', 'core'],
   ['examples/ascent/ascent.json', 'extended'],
 ];
 const cases = [];

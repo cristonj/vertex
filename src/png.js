@@ -26,7 +26,9 @@ export function parseColor(s) {
   if (NAMED[s]) s = NAMED[s];
   let m = /^#([0-9a-f]{3})$/.exec(s);
   if (m) return [...m[1]].map((c) => parseInt(c + c, 16));
-  m = /^#([0-9a-f]{6})$/.exec(s);
+  m = /^#([0-9a-f]{3})[0-9a-f]$/.exec(s);           // #rgba (alpha ignored by the rasterizer)
+  if (m) return [...m[1]].map((c) => parseInt(c + c, 16));
+  m = /^#([0-9a-f]{6})(?:[0-9a-f]{2})?$/.exec(s);    // #rrggbb or #rrggbbaa
   if (m) return [0, 2, 4].map((i) => parseInt(m[1].slice(i, i + 2), 16));
   m = /^rgba?\(([^)]+)\)$/.exec(s);
   if (m) {

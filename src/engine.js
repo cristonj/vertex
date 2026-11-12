@@ -17,7 +17,8 @@ export class Game {
     this.events = [];            // events emitted this step: { type, ...payload }
     this._seed = seed >>> 0 || 1;
     this._initialSeed = this._seed;
-    this.pointer = { x: 0, y: 0 };  // world-space pointer; moved via point(), recorded like keys
+    this.pointer = { x: 0, y: 0 };
+    this.axes = {};                 // analog inputs in [-1, 1], e.g. { x: 0.5, y: -1 }; recorded like keys  // world-space pointer; moved via point(), recorded like keys
     this._pendingScene = null; // recordings remember this, so replays rebuild the same game
   }
 
@@ -39,6 +40,9 @@ export class Game {
 
   /** Move the pointer (mouse/touch) to world coordinates. Press/release it as the "pointer" action. */
   point(x, y) { this.pointer.x = x; this.pointer.y = y; }
+
+  /** Set an analog axis (stick, joystick, trigger) to a value in [-1, 1]. */
+  axis(name, value) { if (value) this.axes[name] = value; else delete this.axes[name]; }
 
   /** Fire a `type` event `seconds` from now (stored in the world, so it survives save/rewind). */
   after(seconds, type, payload = {}) {
@@ -101,7 +105,7 @@ export class Game {
     const w = this.world;
     return {
       world: structuredClone(w.toJSON()), frame: w.frame, time: w.time, nextId: w._nextId,
-      seed: this._seed, input: [...this.input], pressed: [...this.pressed], pointer: { ...this.pointer },
+      seed: this._seed, input: [...this.input], pressed: [...this.pressed], pointer: { ...this.pointer }, axes: { ...this.axes },
     };
   }
 
@@ -112,6 +116,7 @@ export class Game {
     this.input = new Set(st.input);
     this.pressed = new Set(st.pressed);
     this.pointer = { x: 0, y: 0, ...st.pointer };
+    this.axes = { ...st.axes };
     return this;
   }
 

@@ -31,6 +31,8 @@ export class Recorder {
     const release = game.release.bind(game);
     game.press = (a) => { if (!game.input.has(a)) this.inputs.push([game.world.frame, 'p', a]); press(a); };
     game.release = (a) => { if (game.input.has(a)) this.inputs.push([game.world.frame, 'r', a]); release(a); };
+    const axis = game.axis.bind(game);
+    game.axis = (name, v) => { if ((game.axes[name] ?? 0) !== (v || 0)) this.inputs.push([game.world.frame, 'a', name, v || 0]); axis(name, v); };
     const point = game.point.bind(game);
     game.point = (x, y) => {
       if (x !== game.pointer.x || y !== game.pointer.y) this.inputs.push([game.world.frame, 'm', x, y]);
@@ -52,11 +54,12 @@ export class Recorder {
   }
 }
 
-/** Apply one logged input: [frame, "p"|"r", action] or [frame, "m", x, y] (pointer move). */
+/** Apply one logged input: [frame, "p"|"r", action], [frame, "m", x, y] (pointer) or [frame, "a", axis, value]. */
 export function applyInput(game, inp) {
   if (inp[1] === 'p') game.press(inp[2]);
   else if (inp[1] === 'r') game.release(inp[2]);
   else if (inp[1] === 'm') game.point(inp[2], inp[3]);
+  else if (inp[1] === 'a') game.axis(inp[2], inp[3]);
 }
 
 /** Drive a fresh game through a recording, frame by frame. Returns the game at the final frame. */
