@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Vertex Engine</title>
+  <meta name="description" content="A vector-native, agent-first game format and engine. Every asset is an SVG path, every scene is JSON, a whole game fits in a link.">
+  <style>
+    :root { --bg: #0b0d12; --panel: #121620; --fg: #c8ccd4; --dim: #7b8394; --hi: #fff; --accent: #7df9ff; --warm: #ffcf5a; --line: #ffffff17; }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.6 system-ui, -apple-system, Segoe UI, sans-serif; }
+    a { color: var(--accent); text-decoration: none; } a:hover { text-decoration: underline; }
+    code, pre, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    .wrap { max-width: 1080px; margin: 0 auto; padding: 0 16px; }
+    .hero > *, .grid2 > *, .games > *, .features > *, .facts > * { min-width: 0; }
+    nav { display: flex; flex-wrap: wrap; gap: 8px 20px; align-items: center; padding: 18px 0; font-size: 14px; }
+    nav b { color: var(--accent); letter-spacing: .14em; font-family: ui-monospace, monospace; margin-right: auto; }
+    nav a { color: var(--fg); }
+    .hero { display: grid; grid-template-columns: 1.05fr 1fr; gap: 40px; align-items: center; padding: 28px 0 56px; }
+    h1 { font-size: clamp(32px, 5vw, 52px); line-height: 1.08; color: var(--hi); margin: 0 0 18px; letter-spacing: -.02em; }
+    h1 em { font-style: normal; color: var(--accent); }
+    .lede { font-size: 18px; color: var(--fg); max-width: 34em; }
+    .cta { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 26px; }
+    .btn { display: inline-block; padding: 10px 18px; border-radius: 8px; border: 1px solid var(--line); color: var(--hi); font-weight: 600; font-size: 15px; }
+    .btn.primary { background: var(--accent); color: #06121a; border-color: var(--accent); }
+    .btn:hover { text-decoration: none; filter: brightness(1.1); }
+    .stage { position: relative; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: #0d0b1a; aspect-ratio: 4 / 3; }
+    .stage canvas { width: 100%; height: 100%; display: block; }
+    .caption { margin: 8px 2px 0; font: 12px ui-monospace, monospace; color: var(--dim); }
+    .facts { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+    .facts div { background: var(--panel); padding: 18px 20px; }
+    .facts b { display: block; color: var(--hi); font-size: 26px; font-family: ui-monospace, monospace; }
+    .facts small { color: var(--dim); font-size: 13px; }
+    h2 { color: var(--hi); font-size: 26px; margin: 64px 0 8px; letter-spacing: -.01em; }
+    .sub { color: var(--dim); margin: 0 0 22px; }
+    .games { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+    .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 6px; color: var(--fg); }
+    .card:hover { border-color: #7df9ff66; text-decoration: none; }
+    .card b { color: var(--hi); font-size: 17px; }
+    .card .meta { color: var(--dim); font: 12px ui-monospace, monospace; margin-top: auto; padding-top: 8px; }
+    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    pre { background: #07090d; border: 1px solid var(--line); border-radius: 10px; padding: 16px; overflow: auto; font-size: 13px; line-height: 1.5; color: #d6dae3; margin: 0; }
+    .k { color: var(--accent); } .s { color: var(--warm); }
+    .features { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+    .features div { border-top: 2px solid var(--accent); padding-top: 12px; }
+    .features b { color: var(--hi); }
+    .features p { margin: 6px 0 0; font-size: 15px; color: var(--fg); }
+    footer { border-top: 1px solid var(--line); margin-top: 72px; padding: 24px 0 40px; color: var(--dim); font-size: 14px; display: flex; gap: 20px; flex-wrap: wrap; }
+    @media (max-width: 860px) {
+      .hero, .grid2 { grid-template-columns: 1fr; }
+      .games, .features { grid-template-columns: 1fr 1fr; }
+      .facts { grid-template-columns: 1fr 1fr; }
+    }
+    @media (max-width: 520px) { .games, .features { grid-template-columns: 1fr; } nav b { width: 100%; } }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <nav><b>VERTEX</b><a href="play.html">Play</a><a href="https://github.com/cristonj/vertex/blob/master/SPEC.md">Spec</a><a href="https://github.com/cristonj/vertex/blob/master/AGENTS.md">For agents</a><a href="https://github.com/cristonj/vertex">GitHub</a></nav>
+
+    <section class="hero">
+      <div>
+        <h1>Games made of <em>text</em>.</h1>
+        <p class="lede">Vertex is a vector-native game format and engine. Every asset is an SVG path, every scene is JSON,
+          game logic is a tiny sandboxed rules language, and every run is a replay a few KB long. A whole game fits in a link,
+          and humans and AI agents use the same API.</p>
+        <div class="cta">
+          <a class="btn primary" href="play.html">Play Starfall</a>
+          <a class="btn" href="play.html?src=examples/ascent/ascent.json">Play Ascent</a>
+          <a class="btn" href="https://github.com/cristonj/vertex">Source</a>
+        </div>
+      </div>
+      <div><div class="stage"><canvas id="hero" width="960" height="720" aria-label="Starfall, played live by a scripted agent"></canvas></div>
+        <p class="caption">live: Starfall, rendered by Vertex and played by a 6-line policy</p></div>
+    </section>
+
+    <div class="facts">
+      <div><b>~2 KB</b><small>a complete game, as JSON</small></div>
+      <div><b>0</b><small>dependencies</small></div>
+      <div><b>2</b><small>independent runtimes, bit-identical</small></div>
+      <div><b>10k</b><small>entities with exact collision, ~7 ms/step</small></div>
+    </div>
+
+    <h2>Games</h2>
+    <p class="sub">Every one of these is a file you can read, fork and share as a link. Press <span class="mono">`</span> in the player to inspect and edit it live.</p>
+    <div class="games">
+      <a class="card" href="play.html"><b>Starfall</b>Catch stars, dodge shards. Spawning, scoring and difficulty are all rules.<span class="meta">cartridge · 2.3 KB</span></a>
+      <a class="card" href="play.html?src=examples/ascent/ascent.json"><b>Ascent</b>A two-level platformer: physics, scenes, camera follow, particles, timers.<span class="meta">cartridge · 6 KB</span></a>
+      <a class="card" href="examples/drift/"><b>Drift</b>Vector asteroids-style shooter written in JS. Hold R to rewind time.<span class="meta">JS module · outline collision</span></a>
+    </div>
+
+    <h2>A game is one document</h2>
+    <p class="sub">No build step, no assets, no host code. Safe to load from anywhere, and it runs the same in every Vertex implementation.</p>
+    <div class="grid2">
+<pre>{
+  <span class="k">"title"</span>: <span class="s">"Tiny"</span>, <span class="k">"width"</span>: 320, <span class="k">"height"</span>: 240,
+  <span class="k">"shapes"</span>: { <span class="k">"ship"</span>: { <span class="k">"d"</span>: <span class="s">"M10 0 L-8 -6 L-4 0 L-8 6 Z"</span>,
+                      <span class="k">"stroke"</span>: <span class="s">"#7df9ff"</span>, <span class="k">"width"</span>: 2 } },
+  <span class="k">"entities"</span>: [{ <span class="k">"id"</span>: <span class="s">"ship"</span>, <span class="k">"shape"</span>: <span class="s">"ship"</span>,
+                 <span class="k">"x"</span>: 160, <span class="k">"y"</span>: 120, <span class="k">"tags"</span>: [<span class="s">"wrap"</span>] }],
+  <span class="k">"keys"</span>: { <span class="k">"ArrowLeft"</span>: <span class="s">"left"</span>, <span class="k">"ArrowRight"</span>: <span class="s">"right"</span> },
+  <span class="k">"systems"</span>: [<span class="s">"rules"</span>, <span class="s">"motion"</span>, <span class="s">"wrap"</span>],
+  <span class="k">"rules"</span>: [
+    { <span class="k">"each"</span>: <span class="s">"ship"</span>, <span class="k">"when"</span>: <span class="s">"held('left')"</span>,
+      <span class="k">"do"</span>: <span class="s">"self.rot -= 4 * dt"</span> },
+    { <span class="k">"each"</span>: <span class="s">"ship"</span>, <span class="k">"when"</span>: <span class="s">"held('right')"</span>,
+      <span class="k">"do"</span>: <span class="s">"self.rot += 4 * dt"</span> }
+  ]
+}</pre>
+<pre><span class="k"># run headless, read the frame as text</span>
+vertex run game.json --steps 600 --svg frame.svg
+
+<span class="k"># record, scrub, compare runs</span>
+vertex run game.json --policy bot.js --record run.json
+vertex play run.json --at 240 --png frame.png
+vertex diff run.json other.json
+
+<span class="k"># the whole game as a URL</span>
+vertex link game.json
+
+<span class="k"># a second implementation, same frames</span>
+python py/vertex.py conform
+
+<span class="k"># let Claude play it over MCP</span>
+vertex mcp</pre>
+    </div>
+
+    <h2>What's inside</h2>
+    <p class="sub">Zero-dependency JavaScript for browsers and Node, plus a Python runtime that passes the same conformance suite.</p>
+    <div class="features">
+      <div><b>Vectors everywhere</b><p>Full SVG path support, gradients, clipping, a built-in stroke font, procedural shapes, morphing. Rendered by WebGL2, Canvas2D, SVG or pure-JS PNG.</p></div>
+      <div><b>Built for agents</b><p>Run headless, read JSON snapshots or SVG frames, drive named actions, and play over MCP. Agents can author, play-test and balance games.</p></div>
+      <div><b>Time is data</b><p>Deterministic fixed-step simulation. Record, rewind, scrub, branch and diff any run. Multiplayer by exchanging inputs only.</p></div>
+      <div><b>Real game features</b><p>Physics with platforming, outline collision, raycasts, particles, scenes, timers, camera and layers, synthesized sound.</p></div>
+      <div><b>A format with a spec</b><p>SPEC.md defines every byte of the canonical frame. Two runtimes, 84 conformance digests, all identical.</p></div>
+      <div><b>Polished tooling</b><p>CLI, universal player with touch and gamepad, a live inspector with entity editing and hot reload, TypeScript types.</p></div>
+    </div>
+
+    <footer><span>MIT licensed</span><a href="https://github.com/cristonj/vertex/blob/master/VISION.md">Vision</a><a href="https://github.com/cristonj/vertex/blob/master/SPEC.md">Spec</a><a href="https://github.com/cristonj/vertex/blob/master/README.md">Docs</a></footer>
+  </div>
+  <script type="module">
+    // The hero is a live Vertex game played by a tiny policy: chase the nearest star, avoid shards.
+    import { loadCartridge, CanvasRenderer } from './src/index.js';
+    const canvas = document.getElementById('hero');
+    const doc = await (await fetch('examples/starfall/starfall.json')).json();
+    const renderer = new CanvasRenderer(canvas);
+    let game = loadCartridge(doc, { seed: 7 });
+    const policy = (g) => {
+      const p = g.world.get('player'); if (!p) return;
+      const star = g.world.query('star').sort((a, b) => b.y - a.y)[0];
+      const shard = g.world.query('shard').find((s) => s.y > 220 && Math.abs(s.x - p.x) < 40);
+      const target = shard ? p.x + (shard.x > p.x ? -60 : 60) : star ? star.x : p.x;
+      g.release('left'); g.release('right');
+      if (target < p.x - 6) g.press('left'); else if (target > p.x + 6) g.press('right');
+    };
+    let acc = 0, last = performance.now();
+    const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    requestAnimationFrame(function tick(now) {
+      acc += Math.min(0.25, (now - last) / 1000); last = now;
+      while (acc >= game.dt) {
+        acc -= game.dt; policy(game);
+        if (game.step(1).some((e) => e.type === 'gameover') || game.world.state.over) game = loadCartridge(doc, { seed: (Math.random() * 1e9) >>> 0 });
+      }
+      renderer.draw(game.world);
+      if (!reduce) requestAnimationFrame(tick);
+    });
+  </script>
+</body>
+</html>

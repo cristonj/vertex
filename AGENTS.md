@@ -22,7 +22,13 @@ A cartridge is a scene plus `systems`, `rules` and `keys` (see SPEC.md §2.2, §
 { "on": "hit", "tags": ["player", "coin"], "do": "despawn(b); state.score += 1; sound('ding')" }
 { "on": "start", "do": "spawn('coin', {x: rand(0, W), y: 40, tags: ['coin']})" }
 ```
-Put `"rules"` after `collide` in `systems` so hit rules see this step's collisions. Errors name
+Put `"rules"` after `collide`/`physics` in `systems` so hit/contact rules see this step's events.
+
+Platformers and physics: give entities a `body` (`{static: true}` for level geometry,
+`{sensor: true}` for pickups/goals) and add `"physics"` after `"motion"`. Read `self.body.ground`
+to allow jumps. Levels go in `scenes` and are entered with `goto('level2')`; `after(1.5, 'event')`
+schedules an event. Text in the world is `{ "text": "HELLO", "size": 12 }`. Pointer input is the
+`pointer` variable plus the `"pointer"` action. See `examples/ascent/ascent.json`. Errors name
 the rule index and the problem. Test it with `node bin/vertex.js run game.json --steps 600 --svg f.svg`,
 share it with `node bin/vertex.js link game.json`.
 

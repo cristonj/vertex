@@ -24,8 +24,9 @@ python py/vertex.py conform                         # the Python runtime passes 
 npm run serve                                       # then open http://localhost:3000/play.html
 ```
 
-Play in the browser: **[play.html](https://cristonj.github.io/vertex/play.html)** (Starfall),
-or **[Drift](https://cristonj.github.io/vertex/examples/drift/)**. Hold **R** to rewind time.
+Play in the browser: **[cristonj.github.io/vertex](https://cristonj.github.io/vertex/)**, with
+[Starfall](https://cristonj.github.io/vertex/play.html), [Ascent](https://cristonj.github.io/vertex/play.html?src=examples/ascent/ascent.json)
+(platformer) and [Drift](https://cristonj.github.io/vertex/examples/drift/). Hold **R** to rewind time, press **`** to open the inspector.
 
 ## A complete game is one JSON document
 
@@ -68,6 +69,10 @@ game.run(await autoRenderer(canvas));       // browser: WebGL2, falling back to 
 | World + sim | `world.js`, `engine.js`, `systems.js` | JSON world, deterministic fixed step, seeded RNG, events, O(1) lookup, save/load state |
 | Logic | `rules.js`, `cartridge.js` | Sandboxed rules language; single-file cartridges; games as links |
 | Collision | `collision.js`, `spatial.js` | Exact outline collision (the art is the hitbox); spatial-hash broadphase with deterministic order |
+| Physics | `physics.js` | Deterministic gravity, solid bodies (box/circle), restitution, friction, sensors, ground/wall flags, contact events; raycast, point and nearest queries |
+| Gameplay | `engine.js`, `particles.js` | Scenes/levels with `goto`, timers with `after`, data-driven particle emitters, text entities |
+| Input | `input.js` | Keyboard, mouse/touch/pen pointer (recorded in replays), gamepad, generated on-screen touch controls |
+| Devtools | `devtools.js`, `play.html` | Inspector: pause/step, timeline scrubber, entity picking, live JSON editing, hot reload |
 | Rendering | `render.js`, `webgl.js`, `png.js`, `view.js`, `tess.js` | Canonical SVG frame, Canvas2D, WebGL2 (stencil-then-cover), pure-JS PNG; camera, layers, parallax, culling |
 | Animation | `animate.js` | Path morphing, keyframes |
 | Sound | `audio.js` | Synth-parameter sound effects, note-string music, WAV export, WebAudio playback |
@@ -114,6 +119,9 @@ BroadcastChannel, or any `{ send, onMessage }`).
 
 ## Performance
 
+Rules compile to closures once at load time. `node bench/rules-bench.js`: 5,000 entities each
+running two `each` rules take ~2.7 ms per step.
+
 `npm run bench` (Node 22, one core), at constant density with exact outline collision:
 
 | Entities | Step | SVG frame | Heap |
@@ -126,6 +134,8 @@ BroadcastChannel, or any `{ send, onMessage }`).
 - `node --test`: 70+ tests covering parser, world, rules, collision, rendering, PNG, replay, timelines, lockstep, CLI, MCP and conformance.
 - `python py/vertex.py conform`: the second implementation reproduces all 42 conformance digests.
 - `node tools/browser/run.mjs`: renders the same frames with WebGL2 and Canvas2D in headless Chrome and compares pixels.
+- `node tools/browser/play-check.mjs`: loads every example cartridge in the player in headless Chrome.
+- `npx -p typescript tsc -p types`: the TypeScript declarations (`types/index.d.ts`) type-check under `strict`.
 
 ## License
 

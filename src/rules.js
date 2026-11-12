@@ -154,66 +154,140 @@ export function parseExpr(src) {
 
 const FORBIDDEN = new Set(['__proto__', 'prototype', 'constructor']);
 
-function truthy(v) { return !!v; }
+// ---- Closure compiler. Each AST node becomes a JS function once, at load time; evaluation
+// is then plain function calls (no per-node dispatch). Semantics are identical to SPEC.md §6.
+// Environment `env`: { vars (bindings, prototype-chained per execution), locals, fns }.
 
-function run(node, env) {
-  switch (node.k) {
-    case 'block': for (const s of node.body) run(s, env); return;
-    case 'if': if (truthy(ev(node.cond, env))) run(node.then, env); else if (node.other) run(node.other, env); return;
-    case 'let': env.locals[node.name] = ev(node.value, env); return;
-    case 'assign': {
-      const v = ev(node.value, env);
-      let obj, key;
-      if (node.target.k === 'name') { obj = env.locals; key = node.target.v; if (!(key in obj)) throw new Error(`rules: unknown variable "${key}" (declare it with let)`); }
-      else { obj = ev(node.target.o, env); key = ev(node.target.p, env); }
-      if (obj == null || typeof obj !== 'object') throw new Error(`rules: cannot set "${key}" on ${obj}`);
-      if (FORBIDDEN.has(key)) throw new Error(`rules: forbidden field "${key}"`);
-      const cur = obj[key];
-      obj[key] = node.op === '=' ? v : node.op === '+=' ? cur + v : node.op === '-=' ? cur - v : node.op === '*=' ? cur * v : cur / v;
-      return;
-    }
-    case 'expr': ev(node.e, env); return;
+const hasOwn = Object.prototype.hasOwnProperty;
+
+// Names declared with `let` anywhere in the program being compiled (set per compile).
+let LETS = new Set();
+function letsOf(node, out = new Set()) {
+  if (!node || typeof node !== 'object') return out;
+  if (node.k === 'let') out.add(node.name);
+  for (const v of Object.values(node)) {
+    if (Array.isArray(v)) v.forEach((x) => letsOf(x, out)); else if (v && typeof v === 'object') letsOf(v, out);
   }
+  return out;
+}
+const withLets = (ast, fn) => { const prev = LETS; LETS = letsOf(ast); try { return fn(ast); } finally { LETS = prev; } };
+
+function member(o, p) {
+  if (FORBIDDEN.has(p)) throw new Error(`rules: forbidden field "${p}"`);
+  if (o == null) return undefined;
+  if (typeof o !== 'object' && typeof o !== 'string') return undefined;
+  return hasOwn.call(o, p) || Array.isArray(o) ? o[p] : (p === 'length' ? o.length : undefined);
 }
 
-function ev(node, env) {
+function compileExpr(node) {
   switch (node.k) {
-    case 'lit': return node.v;
+    case 'lit': { const v = node.v; return () => v; }
     case 'name': {
-      if (node.v in env.locals) return env.locals[node.v];
-      if (node.v in env.vars) return env.vars[node.v];
-      throw new Error(`rules: unknown name "${node.v}"`);
+      const n = node.v;
+      if (!LETS.has(n)) { // never declared with let in this program: bindings only
+        return (env) => {
+          const v = env.vars[n];
+          if (v !== undefined || n in env.vars) return v;
+          throw new Error(`rules: unknown name "${n}"`);
+        };
+      }
+      return (env) => {
+        if (n in env.locals) return env.locals[n];
+        if (n in env.vars) return env.vars[n];
+        throw new Error(`rules: unknown name "${n}"`);
+      };
     }
     case 'member': {
-      const o = ev(node.o, env), p = ev(node.p, env);
-      if (FORBIDDEN.has(p)) throw new Error(`rules: forbidden field "${p}"`);
-      if (o == null) return undefined;
-      if (typeof o !== 'object' && typeof o !== 'string') return undefined;
-      return Object.prototype.hasOwnProperty.call(o, p) || Array.isArray(o) ? o[p] : (p === 'length' ? o.length : undefined);
+      const o = compileExpr(node.o);
+      if (node.p.k === 'lit') { const p = node.p.v; return (env) => member(o(env), p); }
+      const p = compileExpr(node.p);
+      return (env) => member(o(env), p(env));
     }
     case 'call': {
-      const f = env.fns[node.f];
-      if (!f) throw new Error(`rules: unknown function "${node.f}"`);
-      return f(...node.args.map((a) => ev(a, env)));
+      const name = node.f, args = node.args.map(compileExpr);
+      const n = args.length;
+      return (env) => {
+        const f = env.fns[name];
+        if (!f) throw new Error(`rules: unknown function "${name}"`);
+        if (n === 0) return f();
+        if (n === 1) return f(args[0](env));
+        if (n === 2) return f(args[0](env), args[1](env));
+        return f(...args.map((a) => a(env)));
+      };
     }
-    case 'un': { const a = ev(node.a, env); return node.op === '-' ? -a : !truthy(a); }
-    case 'cond': return truthy(ev(node.c, env)) ? ev(node.a, env) : ev(node.b, env);
-    case 'arr': return node.items.map((x) => ev(x, env));
-    case 'obj': { const o = {}; for (const [k, v] of node.fields) { if (FORBIDDEN.has(k)) throw new Error(`rules: forbidden key "${k}"`); o[k] = ev(v, env); } return o; }
+    case 'un': {
+      const a = compileExpr(node.a);
+      return node.op === '-' ? (env) => -a(env) : (env) => !a(env);
+    }
+    case 'cond': { const c = compileExpr(node.c), a = compileExpr(node.a), b = compileExpr(node.b); return (env) => (c(env) ? a(env) : b(env)); }
+    case 'arr': { const items = node.items.map(compileExpr); return (env) => items.map((x) => x(env)); }
+    case 'obj': {
+      const fields = node.fields.map(([k, v]) => {
+        if (FORBIDDEN.has(k)) throw new SyntaxError(`rules: forbidden key "${k}"`);
+        return [k, compileExpr(v)];
+      });
+      return (env) => { const o = {}; for (const [k, v] of fields) o[k] = v(env); return o; };
+    }
     case 'bin': {
-      if (node.op === '&&') { const a = ev(node.a, env); return truthy(a) ? ev(node.b, env) : a; }
-      if (node.op === '||') { const a = ev(node.a, env); return truthy(a) ? a : ev(node.b, env); }
-      const a = ev(node.a, env), b = ev(node.b, env);
+      const a = compileExpr(node.a), b = compileExpr(node.b);
       switch (node.op) {
-        case '+': return a + b; case '-': return a - b; case '*': return a * b; case '/': return a / b;
-        case '%': return a % b;
-        case '==': return a === b; case '!=': return a !== b;
-        case '<': return a < b; case '<=': return a <= b; case '>': return a > b; case '>=': return a >= b;
+        case '&&': return (env) => { const x = a(env); return x ? b(env) : x; };
+        case '||': return (env) => { const x = a(env); return x ? x : b(env); };
+        case '+': return (env) => a(env) + b(env);
+        case '-': return (env) => a(env) - b(env);
+        case '*': return (env) => a(env) * b(env);
+        case '/': return (env) => a(env) / b(env);
+        case '%': return (env) => a(env) % b(env);
+        case '==': return (env) => a(env) === b(env);
+        case '!=': return (env) => a(env) !== b(env);
+        case '<': return (env) => a(env) < b(env);
+        case '<=': return (env) => a(env) <= b(env);
+        case '>': return (env) => a(env) > b(env);
+        case '>=': return (env) => a(env) >= b(env);
       }
     }
   }
   throw new Error(`rules: bad node ${node.k}`);
 }
+
+function compileStmt(node) {
+  switch (node.k) {
+    case 'block': {
+      const body = node.body.map(compileStmt);
+      if (body.length === 1) return body[0];
+      return (env) => { for (let i = 0; i < body.length; i++) body[i](env); };
+    }
+    case 'if': {
+      const c = compileExpr(node.cond), t = compileStmt(node.then), o = node.other ? compileStmt(node.other) : null;
+      return (env) => { if (c(env)) t(env); else if (o) o(env); };
+    }
+    case 'let': { const name = node.name, v = compileExpr(node.value); return (env) => { env.locals[name] = v(env); }; }
+    case 'assign': {
+      const v = compileExpr(node.value), op = node.op;
+      const apply = (cur, x) => (op === '=' ? x : op === '+=' ? cur + x : op === '-=' ? cur - x : op === '*=' ? cur * x : cur / x);
+      if (node.target.k === 'name') {
+        const key = node.target.v;
+        return (env) => {
+          const x = v(env);
+          if (!(key in env.locals)) throw new Error(`rules: unknown variable "${key}" (declare it with let)`);
+          env.locals[key] = apply(env.locals[key], x);
+        };
+      }
+      const o = compileExpr(node.target.o), p = compileExpr(node.target.p);
+      return (env) => {
+        const x = v(env), obj = o(env), key = p(env);
+        if (obj == null || typeof obj !== 'object') throw new Error(`rules: cannot set "${key}" on ${obj}`);
+        if (FORBIDDEN.has(key)) throw new Error(`rules: forbidden field "${key}"`);
+        obj[key] = apply(obj[key], x);
+      };
+    }
+    case 'expr': { const e = compileExpr(node.e); return (env) => { e(env); }; }
+  }
+  throw new Error(`rules: bad node ${node.k}`);
+}
+
+/** Builtins are built once per game and reused every step. */
+const builtinCache = new WeakMap();
 
 /** Builtin functions available to rules. Deterministic given the game's seeded RNG. */
 function builtins(game) {
@@ -266,22 +340,33 @@ function builtins(game) {
 export function compileRules(rules) {
   const compiled = rules.map((r, idx) => {
     try {
-      return { ...r, _do: parse(Array.isArray(r.do) ? r.do.join(';') : r.do), _when: r.when ? parseExpr(r.when) : null };
+      const prog = parse(Array.isArray(r.do) ? r.do.join(';') : r.do);
+      return { ...r, _do: withLets(prog, compileStmt), _when: r.when ? withLets(parseExpr(r.when), compileExpr) : null };
     } catch (e) {
       throw new SyntaxError(`rules[${idx}]: ${e.message}`);
     }
   });
   return function rulesSystem(game, dt) {
     const w = game.world;
-    const fns = builtins(game);
+    let fns = builtinCache.get(game);
+    if (!fns) builtinCache.set(game, (fns = builtins(game)));
     const vars = { dt, frame: w.frame, time: w.time, state: w.state, W: w.width, H: w.height, PI: Math.PI, pointer: game.pointer, camera: w.camera ?? null };
+    const env = { vars, locals: null, fns };
+    // per-execution bindings sit on a child of `vars` (no copying); locals are fresh each time
+    const run = (r, scope) => {
+      env.vars = scope;
+      env.locals = {};
+      if (r._when && !r._when(env)) return;
+      r._do(env);
+    };
     const exec = (r, extra) => {
-      const env = { vars: { ...vars, ...extra }, locals: {}, fns };
-      if (r._when && !truthy(ev(r._when, env))) return;
-      run(r._do, env);
+      env.vars = extra ? { ...vars, ...extra } : vars;
+      env.locals = {};
+      if (r._when && !r._when(env)) return;
+      r._do(env);
     };
     for (const r of compiled) {
-      if (r.on === 'start') { if (w.frame === 0) exec(r, {}); continue; }
+      if (r.on === 'start') { if (w.frame === 0) exec(r, null); continue; }
       if (r.on) {
         for (const event of game.events.slice()) {
           if (event.type !== r.on) continue;
@@ -301,8 +386,11 @@ export function compileRules(rules) {
         }
         continue;
       }
-      if (r.each) { for (const self of w.query(r.each)) if (w.get(self.id) === self) exec(r, { self }); }
-      else exec(r, {});
+      if (r.each) {
+        const scope = { ...vars, self: null }; // one flat scope per rule; `self` rebound per entity
+        for (const self of w.query(r.each)) if (w.get(self.id) === self) { scope.self = self; run(r, scope); }
+      }
+      else exec(r, null);
     }
   };
 }

@@ -1,0 +1,8 @@
+{
+  "compilerOptions": {
+    "strict": true, "noEmit": true, "module": "nodenext", "moduleResolution": "nodenext",
+    "lib": ["es2022", "dom"],
+    "paths": { "vertex-engine": ["./index.d.ts"] }
+  },
+  "include": ["usage.test.mts", "index.d.ts"]
+}
