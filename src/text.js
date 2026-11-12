@@ -3,7 +3,7 @@
 // resolution, rasterizable by the PNG backend, and diffable like every other asset.
 // Grid: 4 units wide, 6 units tall, y=0 at the top, y=6 on the baseline.
 
-const FONT = {
+export const FONT = {
   A: [[[0, 6], [2, 0], [4, 6]], [[1, 4], [3, 4]]],
   B: [[[0, 0], [0, 6]], [[0, 0], [3, 0], [4, 1], [4, 2], [3, 3], [0, 3]], [[0, 3], [3, 3], [4, 4], [4, 5], [3, 6], [0, 6]]],
   C: [[[4, 1], [3, 0], [1, 0], [0, 1], [0, 5], [1, 6], [3, 6], [4, 5]]],

@@ -112,33 +112,36 @@ them, and whole genres explored by search.
 | Stage | Theme | What it adds |
 |---|---|---|
 | **v0.1** (shipped) | Proof | Path parser, JSON world, deterministic loop, canvas and SVG renderers, built-in behaviours, the Drift demo, a headless agent player |
-| **v0.2** (shipped) | Agent loop | CLI runner (`vertex run/play/schema/mcp`), MCP server (load, step, observe, view, screenshot, edit, reset), JSON Schema + construction-time validation, input recording and exact replay, pure-JS PNG output |
-| **v0.3** | Richer vectors | True arcs, exact outline collision, gradients and clipping, path-morph and skeletal animation, vector text, procedural shapes |
-| **v0.4** | Scale | GPU renderer, spatial broadphase, camera and layers, sound as synth data |
-| **v0.5** | Time | Rewind and scrub, branching timelines, input-sync multiplayer, shareable replay files |
-| **v1.0** | The format | A written, versioned spec; single-file games; games as links; a second implementation in another language |
+| **v0.2** (shipped) | Agent loop | CLI runner, MCP server (load, step, observe, view, screenshot, edit, reset), JSON Schema + validation, input recording and exact replay, pure-JS PNG output |
+| **v0.3** (shipped) | Richer vectors | True arcs, exact outline collision, gradients and clipping, path morphing and keyframes, built-in stroke font, procedural shapes |
+| **v0.4** (shipped) | Scale | WebGL2 renderer (stencil-then-cover), spatial-hash broadphase, camera/layers/parallax/culling, sound as synth data |
+| **v0.5** (shipped) | Time | Save/load state, timelines with seek/rewind/branch, divergence finding, frame scrubbing, input-only lockstep multiplayer |
+| **v1.0** (shipped) | The format | [SPEC.md](SPEC.md), the rules language, single-file cartridges, games as links, a second implementation in Python that passes the conformance suite bit-for-bit |
 | **Beyond** | Ecosystem | Prompt-to-game, a public registry of forkable games, an agent benchmark suite, runtime generative content, self-tuning games, 3D |
 
 ## Hard problems
 
-Stated plainly, because the ambition depends on them:
+Stated plainly, with where each one stands:
 
-- **Vector rendering cost.** Many complex filled paths are slower to draw than sprites. The GPU
-  backend has to solve this for large scenes.
-- **Art range.** Vectors suit clean, stylised looks. Painterly or photographic styles are out of
+- **Vector rendering cost.** Many filled paths are slower to draw than sprites. *Addressed:* the
+  WebGL2 backend tessellates each shape once and fills with stencil-then-cover; culling skips
+  off-screen entities. 10,000 entities with exact outline collision step in about 7 ms (`npm run bench`).
+- **Art range.** Vectors suit clean, stylised looks. Painterly or photographic styles remain out of
   scope by design.
-- **Determinism across implementations.** Floating-point behaviour differs between languages and
-  machines. A cross-language spec needs fixed rules for math.
-- **Logic in a portable format.** Rules are JavaScript today. A spec needs a rules format that is
-  safe to run and implementable anywhere.
+- **Determinism across implementations.** *Addressed for the core:* SPEC.md §8 restricts core
+  simulation to correctly rounded IEEE-754 operations and defines the canonical frame byte for
+  byte. Trig- and pow-based features are explicitly "implementation-tolerant".
+- **Logic in a portable format.** *Addressed:* the rules language (SPEC.md §6) is a small,
+  sandboxed expression language. Cartridges contain no host code, so they are safe to load from a
+  link, and the Python runtime runs them identically.
 - **Model reliability.** Generated games need automatic verification, which is why headless
-  play-testing is central rather than optional.
+  play-testing, recordings and the conformance suite are central rather than optional.
 
 ## Where we are today
 
-v0.2 exists and is tested (28 tests, zero dependencies): the parser (arcs are approximated as
-straight lines), the JSON world with schema validation, the deterministic loop, SVG and canvas
-renderers plus a pure-JS PNG rasterizer, circle-based collision, action input, input recordings
-that replay byte-identically, a CLI (`run`, `play`, `schema`, `mcp`), and an MCP server so any
-MCP client can drive a game. One example game ships with a policy module, a recorded run, and a
-verified replay. Everything else in this document is direction, not shipped code.
+Everything through v1.0 is implemented and tested (`node --test`, 70+ tests, zero dependencies):
+two runtimes (JavaScript reference and Python) agree on every conformance digest, a whole game
+fits in a ~1.4 KB link, and any run can be recorded, scrubbed, branched and replayed exactly.
+The WebGL2 renderer is checked against Canvas2D in headless Chrome (`node tools/browser/run.mjs`:
+over 99.5% of pixels match; the rest are anti-aliased edges). Browser audio is only smoke-tested
+(it runs without errors; nobody has listened to it in CI). "Beyond" is direction, not code.

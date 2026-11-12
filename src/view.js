@@ -72,7 +72,10 @@ export function drawList(world, radiusOf, { cull = true, margin = 2 } = {}) {
     if (e.hidden) continue;
     const m = fullMatrix(world, e);
     if (cull) {
-      const rad = radiusOf(e) * matScale(m) + margin + (e.width ?? 0);
+      // Scale from plain arithmetic (no trig), so every implementation culls identically.
+      const cam = world.camera, p = e.parallax ?? 1;
+      const vz = !cam || e.fixed ? 1 : p === 1 ? (cam.zoom ?? 1) : Math.pow(cam.zoom ?? 1, p);
+      const rad = radiusOf(e) * Math.abs(e.scale) * vz + margin + (e.width ?? 0);
       const x = m[4], y = m[5];
       if (x + rad < 0 || y + rad < 0 || x - rad > W || y - rad > H) continue;
     }

@@ -1,115 +1,131 @@
 # Vertex
 
-**A vector-native, agent-first game engine.** Every asset is an SVG path. Every scene is JSON.
-Every run is a tiny replay file. Humans and AI agents drive it through the same API.
+**A vector-native, agent-first game format and engine.** Every asset is an SVG path. Every scene
+is JSON. Game logic is a tiny sandboxed rules language. Every run is a replay file a few KB long.
+A complete game fits in a link. Humans and AI agents drive it through the same API.
 
-- 🪶 **Tiny** — zero dependencies, ~45 KB of readable source. Sprites are tens of bytes, not kilobytes.
-- 📐 **Infinite resolution** — vector art renders crisp at any size or DPI.
-- 🤖 **Agent-first** — run headless, step the sim, read JSON snapshots, render frames as SVG text.
-- 🎯 **Deterministic** — fixed timestep + seeded RNG. Same seed + inputs = same game, every time.
-- ⏱️ **Time is data** — record a run to a few KB of JSON; replay it exactly, at any resolution.
+- 🪶 **Tiny**: zero dependencies. A whole game (art, scene, rules) is ~2 KB of JSON, or a ~1.4 KB link.
+- 📐 **Infinite resolution**: vector art is crisp at any size, rendered by WebGL2, Canvas2D, SVG or PNG.
+- 🤖 **Agent-first**: run headless, step the sim, read JSON snapshots, read frames as SVG text, drive it over MCP.
+- 🎯 **Deterministic**: fixed timestep + seeded RNG. Same seed + inputs = same frame, byte for byte.
+- ⏱️ **Time is data**: rewind, scrub, branch, diff runs; multiplayer by exchanging inputs only.
+- 📜 **A format, not just an engine**: [SPEC.md](SPEC.md) + a conformance suite. A second implementation
+  in Python reproduces every frame digest bit-for-bit.
 
-See [VISION.md](VISION.md) for the why and the roadmap. Agents: start with [AGENTS.md](AGENTS.md).
+[VISION.md](VISION.md) covers the why and the roadmap. Agents: start with [AGENTS.md](AGENTS.md).
 
 ## Quick start
 
 ```bash
 git clone https://github.com/cristonj/vertex && cd vertex
-node --test                    # run the engine tests
-npm run play:agent             # an AI-style policy plays Drift headless, records drift-run.json, verifies the replay
-npm run replay -- --png frame.png   # replay that recording through the CLI, rasterize to PNG
-npm run serve                  # then open http://localhost:3000/examples/drift/
+node --test                                         # engine tests (Node 18.3+)
+node bin/vertex.js run examples/starfall/starfall.json --steps 600 --svg frame.svg
+python py/vertex.py conform                         # the Python runtime passes the conformance suite
+npm run serve                                       # then open http://localhost:3000/play.html
 ```
 
-## A whole game in one object
+Play in the browser: **[play.html](https://cristonj.github.io/vertex/play.html)** (Starfall),
+or **[Drift](https://cristonj.github.io/vertex/examples/drift/)**. Hold **R** to rewind time.
+
+## A complete game is one JSON document
+
+```json
+{
+  "vertex": 1, "title": "Tiny", "width": 320, "height": 240,
+  "shapes": { "ship": { "d": "M10 0 L-8 -6 L-4 0 L-8 6 Z", "stroke": "#7df9ff", "width": 2 } },
+  "entities": [{ "id": "ship", "shape": "ship", "x": 160, "y": 120, "tags": ["ship", "wrap"] }],
+  "keys": { "ArrowLeft": "left", "ArrowRight": "right", "ArrowUp": "go" },
+  "systems": ["rules", "motion", "wrap"],
+  "rules": [
+    { "each": "ship", "when": "held('left')",  "do": "self.rot -= 4 * dt" },
+    { "each": "ship", "when": "held('right')", "do": "self.rot += 4 * dt" },
+    { "each": "ship", "when": "held('go')",    "do": "self.vx += cos(self.rot) * 200 * dt; self.vy += sin(self.rot) * 200 * dt" }
+  ]
+}
+```
+
+That is a cartridge: art + scene + rules + key bindings, with no host code, so it's safe to load
+from anywhere. `vertex link game.json` turns it into a URL that contains the whole game.
+See [examples/starfall/starfall.json](examples/starfall/starfall.json) for a full game in ~60 lines.
+
+## Or write JS
 
 ```js
-import { Game, CanvasRenderer, bindKeys, systems } from 'vertex-engine';
+import { Game, systems, collideOutline, autoRenderer } from 'vertex-engine';
 
-const game = new Game({
-  width: 800, height: 600, background: '#111',
-  shapes: {
-    ship: { d: 'M14 0 L-10 -9 L-5 0 L-10 9 Z', stroke: '#7df9ff', width: 2 },
-  },
-  entities: [{ id: 'ship', shape: 'ship', x: 400, y: 300, vr: 1, tags: ['wrap'] }],
-});
-
-game.use(systems.motion).use(systems.wrap);
-game.run(new CanvasRenderer(document.querySelector('canvas')));  // browser
-// or headless:  game.step(60); console.log(game.snapshot(), game.toSVG(), game.toPNG());
+const game = new Game({ shapes: { ship: { d: 'M14 0 L-10 -9 L-5 0 L-10 9 Z', stroke: '#7df9ff', width: 2 } },
+                        entities: [{ id: 'ship', shape: 'ship', x: 400, y: 300, vr: 1, tags: ['wrap'] }] });
+game.use(systems.motion).use(systems.wrap).use(collideOutline([['bullet', 'rock']]));
+game.run(await autoRenderer(canvas));       // browser: WebGL2, falling back to Canvas2D
+// headless: game.step(60); game.snapshot(); game.toSVG(); game.toPNG({ width: 400 });
 ```
 
-## Core concepts
+## What's inside
 
-| Concept    | What it is |
-|------------|------------|
-| **Shape**  | `{ d, fill?, stroke?, width? }` or `{ parts: [...] }` — raw SVG path data, parsed once. |
-| **Entity** | `{ id, shape, x, y, rot, scale, vx, vy, vr, tags, data }` — plain data. |
-| **World**  | Shapes + entities + `state`. Round-trips via `toJSON()`. Validated on construction. |
-| **System** | `(game, dt) => void`. Runs every fixed step, in order. |
-| **Action** | Named input (`"fire"`). Keyboard binds to actions; agents call `game.press()`. |
-| **Event**  | `game.emit(type, payload)`; `game.step()` returns the events that fired. |
-| **Recording** | `{ vertex: 1, seed, inputs: [[frame, "p"\|"r", action], ...] }` — a whole play session. |
+| Area | Module | Highlights |
+|---|---|---|
+| Geometry | `path.js`, `procedural.js`, `text.js` | Full SVG path parser incl. arcs, flattening, bounds; procedural shapes; built-in stroke font |
+| World + sim | `world.js`, `engine.js`, `systems.js` | JSON world, deterministic fixed step, seeded RNG, events, O(1) lookup, save/load state |
+| Logic | `rules.js`, `cartridge.js` | Sandboxed rules language; single-file cartridges; games as links |
+| Collision | `collision.js`, `spatial.js` | Exact outline collision (the art is the hitbox); spatial-hash broadphase with deterministic order |
+| Rendering | `render.js`, `webgl.js`, `png.js`, `view.js`, `tess.js` | Canonical SVG frame, Canvas2D, WebGL2 (stencil-then-cover), pure-JS PNG; camera, layers, parallax, culling |
+| Animation | `animate.js` | Path morphing, keyframes |
+| Sound | `audio.js` | Synth-parameter sound effects, note-string music, WAV export, WebAudio playback |
+| Time | `replay.js`, `timeline.js`, `lockstep.js` | Recordings, seek/rewind/branch, divergence, input-only multiplayer |
+| Tooling | `cli.js`, `mcp/server.js` | `vertex run/play/diff/link/schema/mcp`; MCP server for Claude and other clients |
+| Format | `SPEC.md`, `schema/`, `conformance/`, `py/` | Normative spec, JSON Schema, conformance suite, Python implementation |
 
 ## The CLI
 
 ```bash
-node bin/vertex.js run examples/drift/drift.js --seed 42 --steps 600 \
-  --policy examples/drift/policy.js --svg frame.svg --png frame.png --record run.json
-node bin/vertex.js play run.json --png replay.png   # replays exactly, exit 1 if it doesn't
-node bin/vertex.js schema                           # JSON Schema for scene documents
-node bin/vertex.js mcp                              # serve the MCP server on stdio
+vertex run <scene.js|cartridge.json> [--seed N] [--steps N] [--policy p.js] [--svg f] [--png f] [--record r.json]
+vertex play <recording.json> [--at FRAME] [--svg f] [--png f] [--width W]   # replay exactly, or scrub
+vertex diff <a.json> <b.json>                                               # first frame where two runs diverge
+vertex link <cartridge.json>                                                # the whole game as a URL
+vertex schema                                                               # JSON Schema for scenes
+vertex mcp                                                                  # MCP server on stdio
 ```
-
-`run` executes a scene headless. A *policy* module (default export: `policy(game)`) drives the
-named actions just like a human — that's all an agent needs to playtest. `--record` captures the
-entire run (seed + input log + final-frame digest) as a JSON file you can commit, diff, or send
-as a bug report.
-
-## Recordings: the game IS the log
-
-```js
-import { Recorder, applyRecording, verifyReplay } from 'vertex-engine';
-
-const rec = new Recorder(createGame({ seed: 42 }));   // attach before stepping
-play/recording loop...
-const doc = rec.toJSON({ scene: 'examples/drift/drift.js' });
-
-const g2 = createGame({ seed: doc.seed, fps: doc.fps });  // replay, anywhere, later
-applyRecording(g2, doc);
-verifyReplay(g2, doc);        // throws unless the final frame is byte-identical
-```
-
-Ten seconds of Drift is ~5 KB of input log — smaller than one raster frame — and it replays
-exactly. Rewind, scrub, branch, diff two strategies, or attach the file to a bug report:
-seed + inputs + digest always reproduce.
-
-## Screenshots without a browser
-
-`game.toPNG({ width, height })` rasterizes the vector world to a PNG buffer in pure JS
-(`node:zlib` is the only dependency). Agents get real screenshots for multimodal models;
-humans get previews; nothing native is required. Coordinates match `toSVG` exactly, at any
-resolution — render the same frame at 64×48 or 4K.
 
 ## MCP: play Vertex games from Claude
-
-Vertex ships a zero-dependency [Model Context Protocol](https://modelcontextprotocol.io) server
-so any MCP client can drive the engine: `load → step → observe → view/screenshot → edit → reset`.
 
 ```jsonc
 // claude_desktop_config.json
 { "mcpServers": { "vertex": { "command": "node", "args": ["/path/to/vertex/bin/vertex.js", "mcp"] } } }
 ```
 
-Tools take/return plain JSON and SVG text. `observe` is a compact entity snapshot (see without
-vision); `view` is the frame as SVG; `screenshot` returns a PNG; `edit` rewrites the live world
-(spawn/despawn/set/state) while the game runs; `reset` rebuilds with a seed.
+Tools: `load` (module path, cartridge path, or inline JSON), `step`, `observe` (JSON snapshot),
+`view` (SVG frame), `screenshot` (PNG), `edit` (spawn/despawn/set/state on the live world), `reset`.
 
-## Scene schema
+## Time is data
 
-[schema/scene.schema.json](schema/scene.schema.json) formally describes the format — use it to
-drive code generators and editors. The engine validates every scene at construction with
-agent-friendly errors (`src/validate.js`): a bad scene fails fast with the exact path to fix.
+```js
+import { Timeline, Lockstep, memoryTransport } from 'vertex-engine';
+
+const t = new Timeline(createGame, { seed: 42 });  // logs inputs, keeps checkpoints
+t.press('fire'); t.step(300);
+t.seek(120);                                       // exact frame 120
+const alt = t.branch(120);                         // an alternate future sharing the past
+t.toRecording();                                   // the whole run as a replay file
+```
+
+Lockstep multiplayer: every peer runs the same simulation and exchanges only input changes
+tagged with a frame. Peers stall rather than desync. Transports are pluggable (in-memory,
+BroadcastChannel, or any `{ send, onMessage }`).
+
+## Performance
+
+`npm run bench` (Node 22, one core), at constant density with exact outline collision:
+
+| Entities | Step | SVG frame | Heap |
+|---|---|---|---|
+| 1,000 | ~1.5 ms | ~1.6 ms | ~10 MB |
+| 10,000 | ~6.7 ms | ~10 ms | ~50 MB |
+
+## Verification
+
+- `node --test`: 70+ tests covering parser, world, rules, collision, rendering, PNG, replay, timelines, lockstep, CLI, MCP and conformance.
+- `python py/vertex.py conform`: the second implementation reproduces all 42 conformance digests.
+- `node tools/browser/run.mjs`: renders the same frames with WebGL2 and Canvas2D in headless Chrome and compares pixels.
 
 ## License
 

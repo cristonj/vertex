@@ -1,0 +1,40 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>pending</title>
+<canvas id="gl" width="480" height="360"></canvas><canvas id="c2" width="480" height="360"></canvas>
+<pre id="out"></pre>
+<script type="module">
+  // Renders identical frames with WebGL2 and Canvas2D and reports how many pixels differ.
+  import { loadCartridge, CanvasRenderer, WebGLRenderer, Timeline, attachAudio } from '../../src/index.js';
+  const out = {};
+  try {
+    for (const src of ['../../examples/starfall/starfall.json', '../../conformance/cartridges/torture.json']) {
+      const doc = await (await fetch(src)).json();
+      const g = loadCartridge(doc, { seed: 3 });
+      g.step(400);
+      const W = doc.width, H = doc.height;
+      const a = document.getElementById('gl'), b = document.getElementById('c2');
+      a.width = b.width = W; a.height = b.height = H;
+      const gl = new WebGLRenderer(a); gl.draw(g.world);
+      new CanvasRenderer(b).draw(g.world);
+      const pa = new Uint8Array(W * H * 4);
+      const ctx = gl.gl; ctx.readPixels(0, 0, W, H, ctx.RGBA, ctx.UNSIGNED_BYTE, pa);
+      const pb = b.getContext('2d').getImageData(0, 0, W, H).data;
+      let diff = 0, lit = 0;
+      for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+        const i = ((H - 1 - y) * W + x) * 4, j = (y * W + x) * 4;  // GL rows are bottom-up
+        const d = Math.abs(pa[i] - pb[j]) + Math.abs(pa[i + 1] - pb[j + 1]) + Math.abs(pa[i + 2] - pb[j + 2]);
+        if (d > 96) diff++;
+        if (pb[j] + pb[j + 1] + pb[j + 2] > 120) lit++;
+      }
+      out[src.split('/').pop()] = { pixels: W * H, differing: diff, lit, draws: gl.stats.draws, entities: gl.stats.entities };
+    }
+    // Timeline + audio wiring smoke test (AudioContext exists in Chrome)
+    const doc = await (await fetch('../../examples/starfall/starfall.json')).json();
+    const t = new Timeline((o) => loadCartridge(doc, o), { seed: 1 });
+    const detach = attachAudio(t.game); t.step(120); t.seek(30); t.step(10); detach();
+    out.timeline = t.frame;
+    document.title = 'done';
+  } catch (e) { out.error = String(e.stack || e); document.title = 'error'; }
+  document.getElementById('out').textContent = JSON.stringify(out);
+</script>

@@ -1,18 +1,20 @@
 {
   "name": "vertex-engine",
-  "version": "0.5.0",
-  "description": "A vector-native, agent-first game engine. Everything is SVG paths and JSON.",
+  "version": "1.0.0",
+  "description": "A vector-native, agent-first game format and engine. Everything is SVG paths and JSON; a whole game fits in a link.",
   "type": "module",
   "main": "src/index.js",
   "bin": { "vertex": "bin/vertex.js" },
   "exports": { ".": "./src/index.js", "./node": "./src/node.js", "./mcp": "./mcp/server.js" },
-  "files": ["src", "bin", "mcp", "schema"],
+  "files": ["src", "bin", "mcp", "schema", "play.html", "SPEC.md", "conformance", "py"],
   "scripts": {
     "test": "node --test",
     "play:agent": "node examples/drift/agent-play.js",
     "replay": "node bin/vertex.js play examples/drift/drift-run.json",
     "mcp": "node bin/vertex.js mcp",
     "bench": "node bench/bench.js",
+    "conform": "python py/vertex.py conform",
+    "test:browser": "node tools/browser/run.mjs",
     "serve": "npx --yes serve ."
   },
   "engines": { "node": ">=18.3" },

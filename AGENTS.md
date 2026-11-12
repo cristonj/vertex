@@ -14,6 +14,21 @@ You are a first-class user of this engine. Everything you need is text.
 A scene module exports `createGame(opts)` returning a configured `Game`. That one function is
 the whole contract for the CLI, MCP, and tests.
 
+## The fastest path: write a cartridge (one JSON file, no JS)
+A cartridge is a scene plus `systems`, `rules` and `keys` (see SPEC.md §2.2, §6 and
+`examples/starfall/starfall.json`). Rules are a small sandboxed language:
+```json
+{ "each": "player", "when": "held('left')", "do": "self.x = max(20, self.x - 200 * dt)" }
+{ "on": "hit", "tags": ["player", "coin"], "do": "despawn(b); state.score += 1; sound('ding')" }
+{ "on": "start", "do": "spawn('coin', {x: rand(0, W), y: 40, tags: ['coin']})" }
+```
+Put `"rules"` after `collide` in `systems` so hit rules see this step's collisions. Errors name
+the rule index and the problem. Test it with `node bin/vertex.js run game.json --steps 600 --svg f.svg`,
+share it with `node bin/vertex.js link game.json`.
+
+Keep cross-implementation determinism in mind (SPEC.md §8): `+ - * / sqrt floor` are exact
+everywhere; `sin/cos/atan2`, `drag` and arcs are only "visually identical" across runtimes.
+
 ## Play-testing headless (Node, no browser)
 ```js
 const game = createMyGame({ seed: 1 });
@@ -43,6 +58,12 @@ const doc = rec.toJSON({ scene: 'examples/drift/drift.js' });  // seed + input l
 Replay with `applyRecording(freshGame, doc)` and check with `verifyReplay`. The input log is
 ordered events `[frame, "p"|"r", action]` and replays byte-identically for the same seed.
 Send the whole JSON file as a bug report.
+
+## Time travel
+`new Timeline(createGame, { seed })` logs inputs and checkpoints: `seek(frame)`, `rewind(n)`,
+`branch(frame)`, `toRecording()`. `vertex play run.json --at 120 --svg f.svg` renders any frame;
+`vertex diff a.json b.json` finds the first divergent frame. For checkpoints to be valid, keep
+system state in `world.state` / `entity.data`, never in closures.
 
 ## MCP server
 `node bin/vertex.js mcp` serves tools `load, step, observe, view, screenshot, edit, reset`

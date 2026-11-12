@@ -15,10 +15,9 @@ const r = (n) => Math.round(n * 100) / 100;
 
 const isGrad = (fill) => fill && typeof fill === 'object';
 
-// Gradient/clip defs get stable ids per part across renders.
-const gradIds = new WeakMap();
-const clipIds = new WeakMap();
-let defCounter = 0;
+// Gradient/clip def ids are derived from content position (shape name + part index, or
+// entity id), never from a process-wide counter: the same world always renders the same
+// bytes, so frame digests match across processes, replays and implementations.
 
 function gradStops(g) {
   return [...g.stops].sort((a, b) => a[0] - b[0])
@@ -32,22 +31,14 @@ function gradDefXML(fill, id) {
   return `<linearGradient id="${id}" gradientUnits="userSpaceOnUse" x1="${fill.x1}" y1="${fill.y1}" x2="${fill.x2}" y2="${fill.y2}">${gradStops(fill)}</linearGradient>`;
 }
 
-function fillRef(p) {
-  if (!isGrad(p.fill)) return p.fill ?? 'none';
-  let id = gradIds.get(p);
-  if (!id) { id = `g${++defCounter}`; gradIds.set(p, id); }
-  return `url(#${id})`;
-}
-
-function partAttrs(p) {
-  const fill = fillRef(p);
+function partAttrs(p, key) {
+  const fill = isGrad(p.fill) ? `url(#g-${key})` : (p.fill ?? 'none');
   let attrs = `fill="${fill}" stroke="${p.stroke ?? 'none'}"`;
   if (p.width) attrs += ` stroke-width="${p.width}"`;
   if (p.stroke) attrs += ' stroke-linejoin="round" stroke-linecap="round"';
-  if (isGrad(p.fill)) gradDefs.add(gradDefXML(p.fill, fill.slice(4, -1)));
+  if (isGrad(p.fill)) gradDefs.add(gradDefXML(p.fill, `g-${key}`));
   if (p.clip) {
-    let id = clipIds.get(p);
-    if (!id) { id = `c${++defCounter}`; clipIds.set(p, id); }
+    const id = `c-${key}`;
     gradDefs.add(`<clipPath id="${id}"><path d="${p.clip}"/></clipPath>`);
     attrs += ` clip-path="url(#${id})"`;
   }
@@ -72,8 +63,8 @@ export function toSVG(world, { hud = true, hudFill = '#fff', cull = true } = {})
   hudColor = hudFill;
   gradDefs.clear();
   const defs = Object.entries(world.shapes).map(([name, s]) =>
-    `<g id="${name}">${s.parts.map((p) =>
-      `<path d="${esc(p.d)}" ${partAttrs(p)}/>`).join('')}</g>`).join('');
+    `<g id="${name}">${s.parts.map((p, i) =>
+      `<path d="${esc(p.d)}" ${partAttrs(p, `${name}-${i}`)}/>`).join('')}</g>`).join('');
   const cam = !!world.camera;
   const uses = drawList(world, cullRadius(world), { cull }).map(([e, m]) => {
     const t = cam
@@ -81,7 +72,7 @@ export function toSVG(world, { hud = true, hudFill = '#fff', cull = true } = {})
       : `translate(${r(e.x)} ${r(e.y)}) rotate(${r(e.rot * 180 / Math.PI)}) scale(${r(e.scale)})`;
     if (e.d != null) {
       const p = { d: e.d, fill: e.fill, stroke: e.stroke, width: e.width };
-      return `<path data-id="${e.id}" d="${esc(e.d)}" ${partAttrs(p)} transform="${t}"/>`;
+      return `<path data-id="${e.id}" d="${esc(e.d)}" ${partAttrs(p, `e-${e.id}`)} transform="${t}"/>`;
     }
     if (!e.shape) return '';
     return `<use href="#${e.shape}" data-id="${e.id}" transform="${t}"/>`;

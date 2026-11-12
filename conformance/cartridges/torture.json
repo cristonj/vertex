@@ -1,0 +1,46 @@
+{
+  "vertex": 1,
+  "title": "Conformance torture test",
+  "description": "Exercises number formatting, strings, rules semantics, layers, inline geometry, gradients, clips, camera zoom, culling and the full glyph set. Not a game.",
+  "width": 320, "height": 240, "background": "#101418",
+  "camera": { "x": 160, "y": 120, "zoom": 1.25 },
+  "shapes": {
+    "orb": { "d": "M-8 0 Q-8 -8 0 -8 Q8 -8 8 0 Q8 8 0 8 Q-8 8 -8 0 Z",
+      "fill": { "type": "radial", "cx": 0, "cy": 0, "r": 8, "stops": [[1, "#203040"], [0, "#9cf"]] } },
+    "bar": { "parts": [
+      { "d": "M-20 -3 H20 V3 H-20 Z", "fill": { "type": "linear", "x1": -20, "y1": 0, "x2": 20, "y2": 0, "stops": [[0, "#f60"], [0.5, "#fc0"], [1, "#f60"]] }, "clip": "M-15 -5 L15 -5 L15 5 L-15 5 Z" },
+      { "d": "m-20 -3 c10 -6 30 -6 40 0 s-30 6 -40 0", "stroke": "#fff", "width": 0.75 }
+    ] },
+    "dot": { "d": "M-1.5 0 L1.5 0", "stroke": "#8f8", "width": 3 }
+  },
+  "entities": [
+    { "id": "back", "shape": "bar", "x": 160, "y": 60, "layer": -2, "parallax": 0.5 },
+    { "id": "ui", "shape": "orb", "x": 300, "y": 220, "fixed": true, "layer": 9 },
+    { "id": "mover", "shape": "orb", "x": 40, "y": 120, "vx": 37.3, "vy": -11.1, "vr": 0.7, "tags": ["mover"] },
+    { "id": "blob", "d": "M0 -6 L5 3 L-5 3 Z", "fill": "#f0a", "x": 200, "y": 160, "tags": ["blob"] }
+  ],
+  "state": { "n": 0, "acc": 0, "s": "", "flags": [], "hud": "" },
+  "keys": { " ": "go" },
+  "systems": ["rules", "motion", "wrap", "lifetime", { "collide": [["mover", "blob"], ["dot", "blob"]] }],
+  "rules": [
+    { "on": "start", "do": [
+      "state.big = 1e21 * 3; state.tiny = 0.0000001; state.third = 1 / 3; state.neg = -0.5 * 3",
+      "state.sum = 0.1 + 0.2; state.mod = -7 % 3; state.inf = 1 / 0; state.cat = 'a' + 1 + 2.5 + true + null",
+      "state.flags = [1, 'two', [3]]"
+    ] },
+    { "do": [
+      "state.n += 1",
+      "state.acc = state.acc + sqrt(state.n) * 0.37 - floor(state.n / 7) + round(2.5) + round(-2.5) + abs(-1.25)",
+      "let k = state.n % 30",
+      "if (k == 0) { spawn('dot', {x: rand(0, W), y: rand(0, H), vx: rand(-60, 60), vy: rand(-60, 60), tags: ['dot', 'wrap'], data: {ttl: rand(0.5, 2)}}) }",
+      "if (held('go') && pressed('go')) state.s += 'P' else if (held('go')) state.s += 'h'",
+      "state.mx = max(1, 2, state.n) + min(4, clamp(state.n, 2, 5)) + lerp(0, 10, 0.25) + sign(-3)"
+    ] },
+    { "each": "mover", "do": "self.scale = 1 + 0.25 * ((state.n % 40) / 40); if (self.x > W) self.x -= W; if (self.y < 0) self.y += H" },
+    { "each": "blob", "when": "frame % 50 == 0", "do": "self.d = 'M0 ' + str(-6 - (frame % 3)) + ' L5 3 L-5 3 Z'; self.rot += PI / 7" },
+    { "on": "hit", "tags": ["dot", "blob"], "do": "despawn(a); state.hits = (state.hits || 0) + 1" },
+    { "on": "hit", "tags": ["mover", "blob"], "do": "b.x = rand(20, W - 20); emit('moved', {by: a.id})" },
+    { "on": "moved", "do": "state.last = event.by + '@' + str(event.frame)" },
+    { "do": "state.hud = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ 0123456789 .,:!?-+=/<>()\"*% ' + str(state.n) + ' ' + str(state.third) + ' ' + str(state.acc)" }
+  ]
+}
