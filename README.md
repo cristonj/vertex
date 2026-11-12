@@ -1,10 +1,11 @@
 # Vertex
 
-**A vector-native, agent-first game engine and format.** 2D and 3D games are small JSON documents:
-SVG paths and meshes for art, a sandboxed rules language for logic. Runs in the browser, headless
-in Node, and as an authoritative multiplayer server. Zero dependencies.
+**An extremely opinionated framework for games made of text.** 2D and 3D games are small JSON
+documents: SVG paths and meshes for art, a sandboxed rules language for logic. Runs in the browser,
+headless in Node, and as an authoritative multiplayer server, with a plain library underneath.
+Zero dependencies.
 
-[Website and live demos](https://cristonj.github.io/vertex/) · [Getting started](docs/getting-started.md) · [Spec](SPEC.md) · [For AI agents](AGENTS.md) · [Changelog](CHANGELOG.md)
+**[Documentation](https://cristonj.github.io/vertex/docs/)** · [Live demos](https://cristonj.github.io/vertex/) · [Tutorial](docs/tutorial.md) · [The Vertex way](docs/philosophy.md) · [Spec](SPEC.md) · [For AI agents](AGENTS.md) · [Changelog](CHANGELOG.md)
 
 ```bash
 npx vertex-engine new mygame --template platformer   # or topdown, 3d, arcade

@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Huge worlds, dialogue and interactions · Vertex docs</title>
+<link rel="stylesheet" href="docs.css">
+</head>
+<body>
+<header class="top"><a class="brand" href="../index.html">VERTEX</a><a href="README.html">Docs</a><span class="sp"></span><input id="q" type="search" placeholder="Search docs  /" aria-label="Search docs" autocomplete="off"><a href="https://github.com/cristonj/vertex">GitHub</a><button id="menu" aria-label="Menu">☰</button></header>
+<div id="results" hidden></div>
+<div class="layout">
+<nav class="side"><b>Start</b><a href="README.html">Overview</a><a href="philosophy.html">The Vertex way</a><a href="getting-started.html">Getting started</a><a href="tutorial.html">Tutorial</a><a href="concepts.html">Concepts</a><b>Build</b><a href="cookbook.html">Cookbook</a><a href="multiplayer.html">Multiplayer</a><a href="worlds.html" class="on">Worlds & dialogue</a><a href="3d.html">3D</a><a href="troubleshooting.html">Troubleshooting</a><b>Reference</b><a href="reference/rules.html">Rules</a><a href="reference/cartridge.html">Cartridge</a><a href="reference/systems.html">Systems</a><a href="reference/api.html">JavaScript API</a><a href="reference/cli.html">CLI</a></nav>
+<main><h1 id="huge-worlds-dialogue-and-interactions">Huge worlds, dialogue and interactions</h1>
+<h2 id="endless-worlds-with-streaming">Endless worlds with streaming<a class="anchor" href="#endless-worlds-with-streaming">#</a></h2>
+<pre><code class="lang-jsonc"><span class="k">&quot;streaming&quot;</span>: { <span class="k">&quot;chunk&quot;</span>: 320, <span class="k">&quot;radius&quot;</span>: 1, <span class="k">&quot;focus&quot;</span>: <span class="s">&quot;player&quot;</span> },
+<span class="k">&quot;systems&quot;</span>: [&quot;streaming&quot;, &quot;rules&quot;, &quot;motion&quot;, ...]</code></pre>
+<p>Only chunks within <code>radius</code> of a <code>focus</code> entity are awake. Everything else sleeps as JSON in <code>world.dormant</code> and wakes exactly as it was. Memory and CPU follow the number of players, not the size of the world.</p>
+<p>Generate content the first time a chunk is seen, from a seed, so the world is the same every time (and in every runtime):</p>
+<pre><code class="lang-jsonc">{ <span class="k">&quot;on&quot;</span>: <span class="s">&quot;chunkEnter&quot;</span>, <span class="k">&quot;when&quot;</span>: <span class="s">&quot;event.fresh&quot;</span>, <span class="k">&quot;do&quot;</span>: [
+  &quot;repeat (10) { let x = event.x + hash(event.cx, event.cy, i) * event.size; let y = event.y + hash(event.cx, event.cy, 50 + i) * event.size; if (noise(x / 200, y / 200, 1) &gt; 0.5) spawn('tree', {x: x, y: y, body: {static: true}}) }&quot;
+] }</code></pre>
+<ul><li><code>hash(a, b, c)</code> → [0, 1), <code>noise(x, y, seed)</code> → smooth [0, 1), <code>repeat (n) { ... i ... }</code>.</li><li><code>chunkLeave</code> fires when a chunk goes to sleep. Entities tagged with a <code>keep</code> tag never sleep.</li><li>For 3D ground worlds use <code>&quot;plane&quot;: &quot;xz&quot;</code>.</li></ul>
+<h2 id="dialogue">Dialogue<a class="anchor" href="#dialogue">#</a></h2>
+<pre><code class="lang-jsonc"><span class="k">&quot;dialogue&quot;</span>: {
+  <span class="k">&quot;smith&quot;</span>: { <span class="k">&quot;start&quot;</span>: <span class="s">&quot;hi&quot;</span>, <span class="k">&quot;nodes&quot;</span>: {
+    <span class="k">&quot;hi&quot;</span>: { <span class="k">&quot;speaker&quot;</span>: <span class="s">&quot;{npc.data.name}&quot;</span>, <span class="k">&quot;text&quot;</span>: <span class="s">&quot;Need a blade? You have {actor.data.gold} gold.&quot;</span>,
+      <span class="k">&quot;choices&quot;</span>: [
+        { <span class="k">&quot;text&quot;</span>: <span class="s">&quot;Buy (10 gold)&quot;</span>, <span class="k">&quot;when&quot;</span>: <span class="s">&quot;actor.data.gold &gt;= 10&quot;</span>, <span class="k">&quot;do&quot;</span>: <span class="s">&quot;actor.data.gold -= 10; actor.data.sword = true&quot;</span>, <span class="k">&quot;goto&quot;</span>: <span class="s">&quot;sold&quot;</span> },
+        { <span class="k">&quot;text&quot;</span>: <span class="s">&quot;Tell me about the mountain&quot;</span>, <span class="k">&quot;goto&quot;</span>: <span class="s">&quot;lore&quot;</span> },
+        { <span class="k">&quot;text&quot;</span>: <span class="s">&quot;Bye&quot;</span>, <span class="k">&quot;goto&quot;</span>: null } ] },
+    <span class="k">&quot;lore&quot;</span>: { <span class="k">&quot;speaker&quot;</span>: <span class="s">&quot;{npc.data.name}&quot;</span>, <span class="k">&quot;text&quot;</span>: <span class="s">&quot;Long story.\nVery long.&quot;</span>, <span class="k">&quot;next&quot;</span>: <span class="s">&quot;hi&quot;</span> },
+    <span class="k">&quot;sold&quot;</span>: { <span class="k">&quot;text&quot;</span>: <span class="s">&quot;Mind the edge.&quot;</span>, <span class="k">&quot;next&quot;</span>: null } } }
+}</code></pre>
+<ul><li><code>{expr}</code> interpolates rules expressions; <code>npc</code> is who you talk to, <code>actor</code> is the player.</li><li><code>when</code> hides choices; <code>do</code> runs on entering a node or picking a choice; <code>goto</code>/<code>next: null</code> ends.</li><li>Input: up/down to choose, confirm or interact to advance, or tap/click the box.</li><li>Start from rules with <code>talk('smith', npc)</code>; events: <code>dialogue</code>, <code>choice</code>, <code>dialogueEnd</code>.</li><li>Style with <code>dialogueStyle: { panel, border, textColor, speakerColor, activeColor, size, speed }</code>.</li><li>Add <code>&quot;dialogue&quot;</code> (and <code>&quot;interact&quot;</code>) to <code>systems</code>.</li></ul>
+<h2 id="interactions">Interactions<a class="anchor" href="#interactions">#</a></h2>
+<pre><code class="lang-jsonc">{ <span class="k">&quot;shape&quot;</span>: <span class="s">&quot;npc&quot;</span>, <span class="k">&quot;x&quot;</span>: 300, <span class="k">&quot;y&quot;</span>: 200, <span class="k">&quot;data&quot;</span>: { <span class="k">&quot;name&quot;</span>: <span class="s">&quot;Ilka&quot;</span> },
+  <span class="k">&quot;interact&quot;</span>: { <span class="k">&quot;prompt&quot;</span>: <span class="s">&quot;Talk&quot;</span>, <span class="k">&quot;dialogue&quot;</span>: <span class="s">&quot;smith&quot;</span>, <span class="k">&quot;radius&quot;</span>: 40 } }
+{ <span class="k">&quot;shape&quot;</span>: <span class="s">&quot;lever&quot;</span>, <span class="k">&quot;x&quot;</span>: 500, <span class="k">&quot;y&quot;</span>: 200,
+  <span class="k">&quot;interact&quot;</span>: { <span class="k">&quot;prompt&quot;</span>: <span class="s">&quot;Pull&quot;</span>, <span class="k">&quot;do&quot;</span>: <span class="s">&quot;state.gate = true; self.rot = 0.6&quot;</span>, <span class="k">&quot;once&quot;</span>: true } }</code></pre>
+<p>The nearest interactable within <code>radius</code> of each player shows a prompt; the <code>interact</code> action (key, gamepad button, or tapping the prompt) starts its dialogue or runs <code>do</code> with <code>self</code> and <code>actor</code> bound. On touch devices the player shows on-screen buttons for every action the cartridge binds, plus an analog joystick.</p>
+<p>See <code>examples/frontier/frontier.json</code> for all of this together.</p>
+<p class="edit"><a href="https://github.com/cristonj/vertex/edit/master/docs/worlds.md">Edit this page</a></p></main>
+<aside class="toc"><b>On this page</b><a class="l2" href="#endless-worlds-with-streaming">Endless worlds with streaming</a><a class="l2" href="#dialogue">Dialogue</a><a class="l2" href="#interactions">Interactions</a></aside>
+</div>
+<script type="module">
+const up = "";
+// search
+const q = document.getElementById('q'), box = document.getElementById('results');
+let index = null;
+const load = async () => (index ??= await (await fetch(up + 'search.json')).json());
+q.addEventListener('input', async () => {
+  const term = q.value.trim().toLowerCase();
+  if (!term) { box.hidden = true; return; }
+  const words = term.split(/\s+/), hits = [];
+  for (const d of await load()) {
+    const hay = (d.title + ' ' + d.heading + ' ' + d.text).toLowerCase();
+    if (words.every((w) => hay.includes(w))) hits.push(d);
+    if (hits.length > 12) break;
+  }
+  box.innerHTML = hits.length ? hits.map((h) => '<a href="' + up + h.url + '"><b>' + h.heading + '</b><span>' + h.title + '</span></a>').join('') : '<p>No results</p>';
+  box.hidden = false;
+});
+addEventListener('keydown', (e) => { if (e.key === '/' && document.activeElement !== q) { e.preventDefault(); q.focus(); } if (e.key === 'Escape') box.hidden = true; });
+document.getElementById('menu').onclick = () => document.body.classList.toggle('nav-open');
+// playable embeds
+for (const btn of document.querySelectorAll('[data-play]')) {
+  btn.onclick = async () => {
+    const id = btn.dataset.play, canvas = document.getElementById(id);
+    const doc = JSON.parse(document.querySelector('[data-cart="' + id + '"]').textContent);
+    const { createPlayer } = await import(up + '../src/index.js');
+    btn.remove(); canvas.classList.add('on');
+    canvas.width = (doc.width ?? 800) * 2; canvas.height = (doc.height ?? 600) * 2; canvas.style.aspectRatio = (doc.width ?? 800) + '/' + (doc.height ?? 600);
+    await createPlayer({ canvas, cartridge: doc, inspector: false, fit: false });
+    canvas.focus({ preventScroll: true });
+  };
+}
+const auto = new URLSearchParams(location.search).get('play');
+if (auto) { const b = document.querySelector('[data-play="' + auto + '"]'); b?.closest('.play').scrollIntoView({ block: 'center' }); b?.click(); }
+</script>
+</body>
+</html>

@@ -1,7 +1,7 @@
 {
   "name": "vertex-engine",
   "version": "2.0.0",
-  "description": "A vector-native, agent-first game engine and format: 2D and 3D games as tiny JSON documents, deterministic replays, huge streamed worlds, dialogue, and MMO-style multiplayer. Zero dependencies.",
+  "description": "An extremely opinionated framework for games made of text: 2D and 3D games as tiny JSON documents, deterministic replays, huge streamed worlds, dialogue, and MMO-style multiplayer, with a plain library underneath. Zero dependencies.",
   "type": "module",
   "main": "src/index.js",
   "types": "types/index.d.ts",
@@ -25,7 +25,6 @@
     "mcp",
     "schema",
     "types",
-    "docs",
     "examples/*/*.json",
     "examples/*/*.js",
     "examples/*/*.html",
@@ -34,7 +33,8 @@
     "AGENTS.md",
     "CHANGELOG.md",
     "conformance/cartridges",
-    "py"
+    "py",
+    "docs/**/*.md"
   ],
   "scripts": {
     "test": "node --test",
@@ -45,7 +45,8 @@
     "conform": "python py/vertex.py conform",
     "test:browser": "node tools/browser/run.mjs",
     "serve": "npx --yes serve .",
-    "prepublishOnly": "node --test && python py/vertex.py conform"
+    "prepublishOnly": "node --test && python py/vertex.py conform",
+    "docs": "node tools/docs/build.mjs"
   },
   "engines": {
     "node": ">=20.11"
@@ -81,5 +82,8 @@
   "homepage": "https://cristonj.github.io/vertex/",
   "bugs": {
     "url": "https://github.com/cristonj/vertex/issues"
-  }
+  },
+  "sideEffects": [
+    "./src/node.js"
+  ]
 }

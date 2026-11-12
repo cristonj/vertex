@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Getting started · Vertex docs</title>
+<link rel="stylesheet" href="docs.css">
+</head>
+<body>
+<header class="top"><a class="brand" href="../index.html">VERTEX</a><a href="README.html">Docs</a><span class="sp"></span><input id="q" type="search" placeholder="Search docs  /" aria-label="Search docs" autocomplete="off"><a href="https://github.com/cristonj/vertex">GitHub</a><button id="menu" aria-label="Menu">☰</button></header>
+<div id="results" hidden></div>
+<div class="layout">
+<nav class="side"><b>Start</b><a href="README.html">Overview</a><a href="philosophy.html">The Vertex way</a><a href="getting-started.html" class="on">Getting started</a><a href="tutorial.html">Tutorial</a><a href="concepts.html">Concepts</a><b>Build</b><a href="cookbook.html">Cookbook</a><a href="multiplayer.html">Multiplayer</a><a href="worlds.html">Worlds & dialogue</a><a href="3d.html">3D</a><a href="troubleshooting.html">Troubleshooting</a><b>Reference</b><a href="reference/rules.html">Rules</a><a href="reference/cartridge.html">Cartridge</a><a href="reference/systems.html">Systems</a><a href="reference/api.html">JavaScript API</a><a href="reference/cli.html">CLI</a></nav>
+<main><h1 id="getting-started">Getting started</h1>
+<h2 id="install">Install<a class="anchor" href="#install">#</a></h2>
+<pre><code class="lang-bash">npx vertex-engine new mygame --template platformer
+cd mygame
+npm install
+npm start          <span class="c"># http://localhost:8080</span>
+npm test           <span class="c"># headless checks: the game runs and replays exactly</span></code></pre>
+<p>Templates: <code>platformer</code> (physics, scenes, particles), <code>topdown</code> (endless streamed world, NPC dialogue, multiplayer-ready), <code>3d</code> (meshes, chase camera), <code>arcade</code> (the smallest complete game).</p>
+<p>Or add the engine to an existing project:</p>
+<pre><code class="lang-bash">npm install vertex-engine</code></pre>
+<pre><code class="lang-js"><span class="k">import</span> { createPlayer } <span class="k">from</span> 'vertex-engine';
+<span class="k">const</span> cartridge = <span class="k">await</span> (<span class="k">await</span> fetch('game.json')).json();
+<span class="k">await</span> createPlayer({ canvas: document.querySelector('canvas'), cartridge });</code></pre>
+<p>Requirements: Node 20.11+ for tooling and servers; any modern browser (WebGL2, falling back to Canvas2D).</p>
+<h2 id="the-shape-of-a-game">The shape of a game<a class="anchor" href="#the-shape-of-a-game">#</a></h2>
+<p>A game is one JSON document, a <strong>cartridge</strong>:</p>
+<pre><code class="lang-jsonc">{
+  <span class="k">&quot;title&quot;</span>: <span class="s">&quot;My game&quot;</span>, <span class="k">&quot;width&quot;</span>: 480, <span class="k">&quot;height&quot;</span>: 270,
+  <span class="k">&quot;shapes&quot;</span>:   { <span class="k">&quot;hero&quot;</span>: { <span class="k">&quot;d&quot;</span>: <span class="s">&quot;M-8 -12 H8 V12 H-8 Z&quot;</span>, <span class="k">&quot;fill&quot;</span>: <span class="s">&quot;#ffcf5a&quot;</span> } },   // SVG path data
+  <span class="k">&quot;entities&quot;</span>: [{ <span class="k">&quot;id&quot;</span>: <span class="s">&quot;player&quot;</span>, <span class="k">&quot;shape&quot;</span>: <span class="s">&quot;hero&quot;</span>, <span class="k">&quot;x&quot;</span>: 60, <span class="k">&quot;y&quot;</span>: 200, <span class="k">&quot;tags&quot;</span>: [&quot;player&quot;], <span class="k">&quot;body&quot;</span>: {} }],
+  <span class="k">&quot;keys&quot;</span>:     { <span class="k">&quot;ArrowLeft&quot;</span>: <span class="s">&quot;left&quot;</span>, <span class="k">&quot;ArrowRight&quot;</span>: <span class="s">&quot;right&quot;</span>, <span class="k">&quot; &quot;</span>: <span class="s">&quot;jump&quot;</span> },      // keys -&gt; actions
+  <span class="k">&quot;systems&quot;</span>:  [&quot;motion&quot;, &quot;physics&quot;, &quot;rules&quot;],                                    // order matters
+  <span class="k">&quot;rules&quot;</span>: [                                                                     // game logic
+    { <span class="k">&quot;each&quot;</span>: <span class="s">&quot;player&quot;</span>, <span class="k">&quot;do&quot;</span>: <span class="s">&quot;self.vx = ((held('right') ? 1 : 0) - (held('left') ? 1 : 0)) * 200&quot;</span> },
+    { <span class="k">&quot;each&quot;</span>: <span class="s">&quot;player&quot;</span>, <span class="k">&quot;when&quot;</span>: <span class="s">&quot;pressed('jump') &amp;&amp; self.body.ground&quot;</span>, <span class="k">&quot;do&quot;</span>: <span class="s">&quot;self.vy = -500&quot;</span> }
+  ]
+}</code></pre>
+<ul><li><strong>Shapes</strong> are SVG paths (2D), meshes or extrusions (3D). Nothing is a bitmap.</li><li><strong>Entities</strong> are plain JSON objects: position, velocity, tags, <code>data</code> for your own fields.</li><li><strong>Systems</strong> are the built-in behaviors: <code>motion</code>, <code>physics</code>, <code>collide</code>, <code>streaming</code>, <code>particles</code>, <code>dialogue</code>, <code>interact</code>, <code>follow</code>, <code>motion3d</code>, <code>chase</code>, … and <code>rules</code> (your logic).</li><li><strong>Rules</strong> are a small sandboxed language (SPEC.md §6): <code>each</code> tag, <code>when</code> condition, <code>do</code> statements; <code>on</code> events such as <code>hit</code>, <code>contact</code>, <code>chunkEnter</code>, <code>scene</code>, timers.</li></ul>
+<h2 id="workflow">Workflow<a class="anchor" href="#workflow">#</a></h2>
+<div class="table"><table><thead><tr><th>Task</th><th>Command</th></tr></thead><tbody><tr><td>Play locally</td><td><code>npm start</code></td></tr><tr><td>Inspect / edit live</td><td>press <kbd>`</kbd> in the player: pause, scrub time, click entities, edit JSON, hot-reload</td></tr><tr><td>Rewind</td><td>hold <kbd>R</kbd></td></tr><tr><td>Run headless</td><td><code>npx vertex run game.json --steps 600 --svg frame.svg</code></td></tr><tr><td>Record and replay</td><td><code>npx vertex run game.json --policy bot.js --record run.json</code> · <code>npx vertex play run.json</code></td></tr><tr><td>Compare two runs</td><td><code>npx vertex diff a.json b.json</code></td></tr><tr><td>Share</td><td><code>npx vertex link game.json</code> (the whole game in a URL)</td></tr><tr><td>Multiplayer</td><td><code>npm start</code>, then open <code>/?online</code> in several tabs (see multiplayer.md)</td></tr><tr><td>Let an AI play</td><td><code>npx vertex mcp</code> (MCP server for Claude and other clients)</td></tr></tbody></table></div>
+<h2 id="guides">Guides<a class="anchor" href="#guides">#</a></h2>
+<ul><li><a href="multiplayer.html">Multiplayer and MMO servers</a></li><li><a href="worlds.html">Huge worlds, dialogue and interactions</a></li><li><a href="3d.html">3D</a></li><li>The full format: <a href="https://github.com/cristonj/vertex/blob/master/SPEC.md">SPEC.md</a> · Agents: <a href="https://github.com/cristonj/vertex/blob/master/AGENTS.md">AGENTS.md</a></li></ul>
+<p class="edit"><a href="https://github.com/cristonj/vertex/edit/master/docs/getting-started.md">Edit this page</a></p></main>
+<aside class="toc"><b>On this page</b><a class="l2" href="#install">Install</a><a class="l2" href="#the-shape-of-a-game">The shape of a game</a><a class="l2" href="#workflow">Workflow</a><a class="l2" href="#guides">Guides</a></aside>
+</div>
+<script type="module">
+const up = "";
+// search
+const q = document.getElementById('q'), box = document.getElementById('results');
+let index = null;
+const load = async () => (index ??= await (await fetch(up + 'search.json')).json());
+q.addEventListener('input', async () => {
+  const term = q.value.trim().toLowerCase();
+  if (!term) { box.hidden = true; return; }
+  const words = term.split(/\s+/), hits = [];
+  for (const d of await load()) {
+    const hay = (d.title + ' ' + d.heading + ' ' + d.text).toLowerCase();
+    if (words.every((w) => hay.includes(w))) hits.push(d);
+    if (hits.length > 12) break;
+  }
+  box.innerHTML = hits.length ? hits.map((h) => '<a href="' + up + h.url + '"><b>' + h.heading + '</b><span>' + h.title + '</span></a>').join('') : '<p>No results</p>';
+  box.hidden = false;
+});
+addEventListener('keydown', (e) => { if (e.key === '/' && document.activeElement !== q) { e.preventDefault(); q.focus(); } if (e.key === 'Escape') box.hidden = true; });
+document.getElementById('menu').onclick = () => document.body.classList.toggle('nav-open');
+// playable embeds
+for (const btn of document.querySelectorAll('[data-play]')) {
+  btn.onclick = async () => {
+    const id = btn.dataset.play, canvas = document.getElementById(id);
+    const doc = JSON.parse(document.querySelector('[data-cart="' + id + '"]').textContent);
+    const { createPlayer } = await import(up + '../src/index.js');
+    btn.remove(); canvas.classList.add('on');
+    canvas.width = (doc.width ?? 800) * 2; canvas.height = (doc.height ?? 600) * 2; canvas.style.aspectRatio = (doc.width ?? 800) + '/' + (doc.height ?? 600);
+    await createPlayer({ canvas, cartridge: doc, inspector: false, fit: false });
+    canvas.focus({ preventScroll: true });
+  };
+}
+const auto = new URLSearchParams(location.search).get('play');
+if (auto) { const b = document.querySelector('[data-play="' + auto + '"]'); b?.closest('.play').scrollIntoView({ block: 'center' }); b?.click(); }
+</script>
+</body>
+</html>

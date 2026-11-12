@@ -20,3 +20,5 @@ jobs:
       - run: python py/vertex.py conform
       - run: node bench/bench.js
       - run: npx -y -p typescript@5.6.3 tsc -p types
+      - name: docs are built and up to date
+        run: node tools/docs/build.mjs && git diff --exit-code -- docs

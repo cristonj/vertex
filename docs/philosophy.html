@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Vertex way · Vertex docs</title>
+<link rel="stylesheet" href="docs.css">
+</head>
+<body>
+<header class="top"><a class="brand" href="../index.html">VERTEX</a><a href="README.html">Docs</a><span class="sp"></span><input id="q" type="search" placeholder="Search docs  /" aria-label="Search docs" autocomplete="off"><a href="https://github.com/cristonj/vertex">GitHub</a><button id="menu" aria-label="Menu">☰</button></header>
+<div id="results" hidden></div>
+<div class="layout">
+<nav class="side"><b>Start</b><a href="README.html">Overview</a><a href="philosophy.html" class="on">The Vertex way</a><a href="getting-started.html">Getting started</a><a href="tutorial.html">Tutorial</a><a href="concepts.html">Concepts</a><b>Build</b><a href="cookbook.html">Cookbook</a><a href="multiplayer.html">Multiplayer</a><a href="worlds.html">Worlds & dialogue</a><a href="3d.html">3D</a><a href="troubleshooting.html">Troubleshooting</a><b>Reference</b><a href="reference/rules.html">Rules</a><a href="reference/cartridge.html">Cartridge</a><a href="reference/systems.html">Systems</a><a href="reference/api.html">JavaScript API</a><a href="reference/cli.html">CLI</a></nav>
+<main><h1 id="the-vertex-way">The Vertex way</h1>
+<p>Vertex is an <strong>extremely opinionated framework for games made of text</strong>, with a plain library underneath. Each opinion removes a class of work and has a cost:</p>
+<div class="table"><table><thead><tr><th>Opinion</th><th>You get</th><th>You give up</th></tr></thead><tbody><tr><td><strong>Everything is a vector</strong> (SVG paths, meshes, stroke font)</td><td>KB-sized games, any resolution, art that people and models can edit</td><td>bitmaps, textures, painterly art</td></tr><tr><td><strong>Text is the source of truth</strong> (one JSON cartridge)</td><td>diffs, forks, games as links, AI-authored games</td><td>opaque editor-only workflows</td></tr><tr><td><strong>The simulation is deterministic</strong></td><td>few-KB replays, rewind, exact bug reports, tests, lockstep, a bit-identical Python runtime</td><td><code>Math.random()</code> and wall-clock logic (use <code>random</code>, <code>rand</code>, <code>hash</code>, <code>noise</code>)</td></tr><tr><td><strong>Logic is sandboxed rules</strong></td><td>cartridges safe to load from anywhere, portable across runtimes</td><td>arbitrary code (drop to JS systems when needed)</td></tr><tr><td><strong>State lives in the world</strong> (<code>data</code>, <code>state</code>, timers)</td><td>save, rewind and multiplayer sync with no serialization code</td><td>caching state in closures</td></tr><tr><td><strong>Systems run in an explicit order</strong></td><td>a loop you can read in one line; events reach later systems</td><td>occasionally deciding where <code>rules</code> goes (usually last)</td></tr><tr><td><strong>Agents are users</strong></td><td>headless play, JSON/SVG observations, MCP</td><td>nothing</td></tr></tbody></table></div>
+<h2 id="three-layers">Three layers<a class="anchor" href="#three-layers">#</a></h2>
+<div class="table"><table><thead><tr><th>Layer</th><th>You write</th><th>Use when</th></tr></thead><tbody><tr><td>Cartridge (framework)</td><td>JSON: shapes, entities, systems, rules</td><td>almost always</td></tr><tr><td>JS systems</td><td><code>(game, dt) =&gt; { … }</code> next to a cartridge</td><td>logic rules can't express</td></tr><tr><td>Library</td><td>your own loop, using <code>World</code>, <code>Game</code>, renderers, server…</td><td>embedding Vertex in another app</td></tr></tbody></table></div>
+<p>JS systems can break determinism and the state-in-the-world rule. Don't, unless you've decided replays and rewind don't matter for your game.</p>
+<h2 id="not-a-fit">Not a fit<a class="anchor" href="#not-a-fit">#</a></h2>
+<p>Photoreal or texture-heavy art · depth-buffered 3D with shadows or skeletal animation · a visual editor as the main workflow · competitive twitch netcode (see <a href="multiplayer.html#limits-honest">multiplayer limits</a>).</p>
+<p class="edit"><a href="https://github.com/cristonj/vertex/edit/master/docs/philosophy.md">Edit this page</a></p></main>
+<aside class="toc"></aside>
+</div>
+<script type="module">
+const up = "";
+// search
+const q = document.getElementById('q'), box = document.getElementById('results');
+let index = null;
+const load = async () => (index ??= await (await fetch(up + 'search.json')).json());
+q.addEventListener('input', async () => {
+  const term = q.value.trim().toLowerCase();
+  if (!term) { box.hidden = true; return; }
+  const words = term.split(/\s+/), hits = [];
+  for (const d of await load()) {
+    const hay = (d.title + ' ' + d.heading + ' ' + d.text).toLowerCase();
+    if (words.every((w) => hay.includes(w))) hits.push(d);
+    if (hits.length > 12) break;
+  }
+  box.innerHTML = hits.length ? hits.map((h) => '<a href="' + up + h.url + '"><b>' + h.heading + '</b><span>' + h.title + '</span></a>').join('') : '<p>No results</p>';
+  box.hidden = false;
+});
+addEventListener('keydown', (e) => { if (e.key === '/' && document.activeElement !== q) { e.preventDefault(); q.focus(); } if (e.key === 'Escape') box.hidden = true; });
+document.getElementById('menu').onclick = () => document.body.classList.toggle('nav-open');
+// playable embeds
+for (const btn of document.querySelectorAll('[data-play]')) {
+  btn.onclick = async () => {
+    const id = btn.dataset.play, canvas = document.getElementById(id);
+    const doc = JSON.parse(document.querySelector('[data-cart="' + id + '"]').textContent);
+    const { createPlayer } = await import(up + '../src/index.js');
+    btn.remove(); canvas.classList.add('on');
+    canvas.width = (doc.width ?? 800) * 2; canvas.height = (doc.height ?? 600) * 2; canvas.style.aspectRatio = (doc.width ?? 800) + '/' + (doc.height ?? 600);
+    await createPlayer({ canvas, cartridge: doc, inspector: false, fit: false });
+    canvas.focus({ preventScroll: true });
+  };
+}
+const auto = new URLSearchParams(location.search).get('play');
+if (auto) { const b = document.querySelector('[data-play="' + auto + '"]'); b?.closest('.play').scrollIntoView({ block: 'center' }); b?.click(); }
+</script>
+</body>
+</html>
