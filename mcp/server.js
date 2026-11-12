@@ -15,12 +15,12 @@ import { toPNG } from '../src/node.js';
 const TOOLS = [
   {
     name: 'load',
-    description: 'Load a Vertex game into a new session. Either "path" (a scene module exporting createGame) or "scene" (an inline scene document; attach built-in systems by name via "use"). Returns { session, snapshot }.',
+    description: 'Load a Vertex game into a new session. Either "path" (a cartridge .json, or a scene module exporting createGame) or "scene" (an inline scene or cartridge document; for plain scenes attach built-in systems by name via "use"). Returns { session, snapshot }.',
     inputSchema: {
       type: 'object',
       properties: {
-        path: { type: 'string', description: 'Path to a scene module (.js)' },
-        scene: { type: 'object', description: 'Inline scene document (see the scene.schema.json format)' },
+        path: { type: 'string', description: 'Path to a cartridge (.json) or scene module (.js)' },
+        scene: { type: 'object', description: 'Inline scene or cartridge document (SPEC.md §2)' },
         use: { type: 'array', items: { type: 'string' }, description: 'Built-in systems for inline scenes: motion, wrap, lifetime' },
         seed: { type: 'number' },
         fps: { type: 'number' },
@@ -38,6 +38,7 @@ const TOOLS = [
         press: { type: 'array', items: { type: 'string' } },
         release: { type: 'array', items: { type: 'string' } },
         tap: { type: 'array', items: { type: 'string' } },
+        pointer: { type: 'object', description: 'Move the world-space pointer before stepping: { x, y }. Press "pointer" to click.', properties: { x: { type: 'number' }, y: { type: 'number' } } },
       },
       required: ['session'],
     },
@@ -130,7 +131,7 @@ export function createServer() {
             protocolVersion: typeof msg.params?.protocolVersion === 'string'
               ? msg.params.protocolVersion : '2024-11-05',
             capabilities: { tools: {} },
-            serverInfo: { name: 'vertex', version: '0.2.0' },
+            serverInfo: { name: 'vertex', version: '1.1.0' },
           });
         case 'ping':
           return result(id, {});
@@ -180,6 +181,7 @@ async function callTool(sessions, nextSessionId, name, a) {
     case 'step': {
       const s = mustSession(sessions, a.session);
       const g = s.game;
+      if (a.pointer) g.point(a.pointer.x ?? g.pointer.x, a.pointer.y ?? g.pointer.y);
       for (const x of a.press ?? []) g.press(x);
       for (const x of a.release ?? []) g.release(x);
       const taps = a.tap ?? [];

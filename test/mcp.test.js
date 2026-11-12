@@ -88,3 +88,17 @@ test('unknown session and unknown method are clean errors', async () => {
   const out = await server.handle({ jsonrpc: '2.0', id: 2, method: 'bogus/method' });
   assert.equal(out.error.code, -32601);
 });
+
+test('MCP drives a cartridge by path, including physics, scenes and the pointer', async () => {
+  const tool = async (name, args) => (await call('tools/call', { name, arguments: args })).content[0].text;
+  const loaded = JSON.parse(await tool('load', { path: 'examples/ascent/ascent.json', seed: 2 }));
+  const session = loaded.session;
+  await tool('step', { session, steps: 2 });                      // start rule -> level1
+  const before = JSON.parse(await tool('observe', { session })).entities.find((e) => e.id === 'player');
+  const out = await tool('step', { session, steps: 30, press: ['right'], pointer: { x: 10, y: 20 } });
+  assert.match(out, /"scene":"level1"/);
+  const after = JSON.parse(await tool('observe', { session })).entities.find((e) => e.id === 'player');
+  assert.ok(after.x > before.x + 20, 'player ran right under physics');
+  const svg = await tool('view', { session });
+  assert.match(svg, /data-id="sign"/, 'text entity rendered');
+});
