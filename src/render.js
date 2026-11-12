@@ -6,7 +6,7 @@
 
 import { textPath } from './text.js';
 import { drawList } from './view.js';
-import { entityGeom } from './world.js';
+import { entityGeom, inlineD, inlineStyle } from './world.js';
 
 /** Local bounding radius incl. stroke padding, for culling. */
 export const cullRadius = (world) => (e) => { const g = entityGeom(world, e); return (g.bounds?.radius ?? 0) + (g.pad ?? 0); };
@@ -70,9 +70,10 @@ export function toSVG(world, { hud = true, hudFill = '#fff', cull = true } = {})
     const t = cam
       ? `matrix(${m.map((v) => +v.toFixed(4)).join(' ')})`
       : `translate(${r(e.x)} ${r(e.y)}) rotate(${r(e.rot * 180 / Math.PI)}) scale(${r(e.scale)})`;
-    if (e.d != null) {
-      const p = { d: e.d, fill: e.fill, stroke: e.stroke, width: e.width };
-      return `<path data-id="${e.id}" d="${esc(e.d)}" ${partAttrs(p, `e-${e.id}`)} transform="${t}"/>`;
+    const d = inlineD(e);
+    if (d != null) {
+      const p = { d, ...inlineStyle(e) };
+      return `<path data-id="${e.id}" d="${esc(d)}" ${partAttrs(p, `e-${e.id}`)} transform="${t}"/>`;
     }
     if (!e.shape) return '';
     return `<use href="#${e.shape}" data-id="${e.id}" transform="${t}"/>`;
@@ -144,10 +145,11 @@ export class CanvasRenderer {
     for (const [e, m] of drawList(world, cullRadius(world))) {
       ctx.setTransform(sx, 0, 0, sy, 0, 0);
       ctx.transform(m[0], m[1], m[2], m[3], m[4], m[5]);
-      if (e.d != null) {
+      const d = inlineD(e);
+      if (d != null) {
         let rec = this.entityPaths.get(e);
-        if (!rec || rec.d !== e.d) { rec = { d: e.d, path: new Path2D(e.d) }; this.entityPaths.set(e, rec); }
-        this.paint(ctx, { fill: e.fill, stroke: e.stroke, width: e.width }, rec.path, null);
+        if (!rec || rec.d !== d) { rec = { d, path: new Path2D(d) }; this.entityPaths.set(e, rec); }
+        this.paint(ctx, inlineStyle(e), rec.path, null);
         continue;
       }
       const shape = world.shapes[e.shape];

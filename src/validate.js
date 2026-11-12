@@ -5,7 +5,7 @@
 const isNum = (v) => typeof v === 'number' && Number.isFinite(v);
 const isStr = (v) => typeof v === 'string';
 
-const ENTITY_NUMS = ['x', 'y', 'rot', 'scale', 'vx', 'vy', 'vr', 'drag', 'layer', 'parallax', 'width'];
+const ENTITY_NUMS = ['x', 'y', 'rot', 'scale', 'vx', 'vy', 'vr', 'drag', 'layer', 'parallax', 'width', 'size'];
 
 export function checkScene(doc) {
   const errors = [];
@@ -26,6 +26,13 @@ export function checkScene(doc) {
   }
   if (doc.sounds !== undefined && (typeof doc.sounds !== 'object' || doc.sounds === null || Array.isArray(doc.sounds))) {
     err('sounds', 'must be an object mapping name -> sound params');
+  }
+
+  if (doc.scenes !== undefined && (typeof doc.scenes !== 'object' || doc.scenes === null || Array.isArray(doc.scenes))) {
+    err('scenes', 'must be an object mapping name -> { entities, state?, camera? }');
+  }
+  if (doc.physics?.gravity !== undefined && !(Array.isArray(doc.physics.gravity) && doc.physics.gravity.length === 2 && doc.physics.gravity.every(isNum))) {
+    err('physics.gravity', 'must be [gx, gy]');
   }
 
   const names = new Set();
@@ -76,6 +83,8 @@ function checkEntity(e, path, names, err) {
   }
   for (const k of ENTITY_NUMS) if (e[k] !== undefined && !isNum(e[k])) err(`${path}.${k}`, 'must be a number');
   for (const k of ['fill', 'stroke']) if (e[k] !== undefined && !isStr(e[k])) err(`${path}.${k}`, 'must be a CSS color string');
+  if (e.text !== undefined && typeof e.text !== 'string' && typeof e.text !== 'number') err(`${path}.text`, 'must be a string');
+  for (const k of ['body', 'emitter']) if (e[k] !== undefined && (typeof e[k] !== 'object' || e[k] === null || Array.isArray(e[k]))) err(`${path}.${k}`, 'must be an object');
   if (e.tags !== undefined && !(Array.isArray(e.tags) && e.tags.every(isStr))) err(`${path}.tags`, 'must be an array of strings');
   if (e.data !== undefined && (typeof e.data !== 'object' || e.data === null || Array.isArray(e.data))) err(`${path}.data`, 'must be an object');
 }

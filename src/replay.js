@@ -31,6 +31,11 @@ export class Recorder {
     const release = game.release.bind(game);
     game.press = (a) => { if (!game.input.has(a)) this.inputs.push([game.world.frame, 'p', a]); press(a); };
     game.release = (a) => { if (game.input.has(a)) this.inputs.push([game.world.frame, 'r', a]); release(a); };
+    const point = game.point.bind(game);
+    game.point = (x, y) => {
+      if (x !== game.pointer.x || y !== game.pointer.y) this.inputs.push([game.world.frame, 'm', x, y]);
+      point(x, y);
+    };
   }
 
   /** Serialize. Pass { scene: "path/to/scene.js" } so the recording names its scene. */
@@ -47,13 +52,19 @@ export class Recorder {
   }
 }
 
+/** Apply one logged input: [frame, "p"|"r", action] or [frame, "m", x, y] (pointer move). */
+export function applyInput(game, inp) {
+  if (inp[1] === 'p') game.press(inp[2]);
+  else if (inp[1] === 'r') game.release(inp[2]);
+  else if (inp[1] === 'm') game.point(inp[2], inp[3]);
+}
+
 /** Drive a fresh game through a recording, frame by frame. Returns the game at the final frame. */
 export function applyRecording(game, rec) {
   let i = 0;
   for (let f = 0; f < rec.steps; f++) {
     while (i < rec.inputs.length && rec.inputs[i][0] === f) {
-      const [, kind, action] = rec.inputs[i++];
-      if (kind === 'p') game.press(action); else game.release(action);
+      applyInput(game, rec.inputs[i++]);
     }
     game.step(1);
   }

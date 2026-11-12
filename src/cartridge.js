@@ -19,6 +19,9 @@ import * as systems from './systems.js';
 import { collideOutline } from './collision.js';
 import { compileRules } from './rules.js';
 import * as animate from './animate.js';
+import { physics } from './physics.js';
+import { particles } from './particles.js';
+import { follow } from './view.js';
 
 const FACTORIES = {
   motion: () => systems.motion,
@@ -28,6 +31,9 @@ const FACTORIES = {
   collideOutline: (pairs) => collideOutline(pairs),
   morph: () => animate.morphAnim,
   keyframes: () => animate.keyframes,
+  physics: () => physics,
+  particles: () => particles,
+  follow: (arg) => (typeof arg === 'string' ? follow(arg) : follow(arg.id, arg.lerp ?? 1)),
 };
 
 export const CARTRIDGE_KEYS = ['vertex', 'title', 'systems', 'rules', 'keys', 'description'];

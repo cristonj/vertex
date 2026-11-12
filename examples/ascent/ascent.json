@@ -1,0 +1,101 @@
+{
+  "vertex": 1,
+  "title": "Ascent",
+  "description": "A two-level platformer in one JSON file: physics, scenes, camera follow, particles, timers and in-world text.",
+  "width": 480, "height": 270, "background": "#0e1320",
+  "camera": { "x": 240, "y": 135 },
+  "physics": { "gravity": [0, 1300], "iterations": 4 },
+  "shapes": {
+    "hero": { "parts": [
+      { "d": "M-8 -12 H8 V12 H-8 Z", "fill": "#ffcf5a" },
+      { "d": "M1 -6 H5 V-2 H1 Z", "fill": "#0e1320" }
+    ] },
+    "ground": { "d": "M-200 -10 H200 V10 H-200 Z", "fill": "#24304a", "stroke": "#3d5180", "width": 2 },
+    "ledge": { "d": "M-40 -6 H40 V6 H-40 Z", "fill": "#2c3a5a", "stroke": "#5b77b8", "width": 2 },
+    "wide": { "d": "M-60 -6 H60 V6 H-60 Z", "fill": "#2c3a5a", "stroke": "#5b77b8", "width": 2 },
+    "gem": { "d": "M0 -8 L6 0 L0 8 L-6 0 Z", "fill": "#7df9ff" },
+    "flag": { "parts": [
+      { "d": "M-2 -30 H2 V30 H-2 Z", "fill": "#9aa5bd" },
+      { "d": "M2 -30 L24 -22 L2 -14 Z", "fill": "#ff5d73" }
+    ] },
+    "spark": { "d": "M-2 0 L2 0", "stroke": "#7df9ff", "width": 2 },
+    "dust": { "d": "M-1.5 -1.5 H1.5 V1.5 H-1.5 Z", "fill": "#8892a8" }
+  },
+  "sounds": {
+    "jump": { "wave": "square", "freq": 330, "slide": 900, "decay": 0.12, "volume": 0.2, "duty": 0.25 },
+    "gem": { "wave": "triangle", "freq": 990, "slide": 1200, "decay": 0.18, "volume": 0.3 },
+    "win": { "wave": "square", "freq": 523, "slide": 523, "sustain": 0.2, "decay": 0.3, "volume": 0.25 }
+  },
+  "state": { "gems": 0, "level": 0, "hud": "", "message": "" },
+  "scenes": {
+    "level1": {
+      "state": { "level": 1, "message": "LEVEL 1" },
+      "camera": { "x": 240, "y": 135 },
+      "entities": [
+        { "id": "player", "shape": "hero", "x": 60, "y": 200, "tags": ["player"], "body": { "friction": 0 } },
+        { "shape": "ground", "x": 200, "y": 260, "tags": ["solid"], "body": { "static": true } },
+        { "shape": "ground", "x": 640, "y": 260, "tags": ["solid"], "body": { "static": true } },
+        { "shape": "ledge", "x": 320, "y": 195, "tags": ["solid"], "body": { "static": true } },
+        { "shape": "ledge", "x": 470, "y": 150, "tags": ["solid"], "body": { "static": true } },
+        { "shape": "ledge", "x": 640, "y": 110, "tags": ["solid"], "body": { "static": true } },
+        { "shape": "gem", "x": 320, "y": 170, "tags": ["gem"], "body": { "sensor": true } },
+        { "shape": "gem", "x": 470, "y": 125, "tags": ["gem"], "body": { "sensor": true } },
+        { "shape": "gem", "x": 640, "y": 85, "tags": ["gem"], "body": { "sensor": true } },
+        { "id": "goal", "shape": "flag", "x": 800, "y": 220, "tags": ["goal"], "body": { "sensor": true } },
+        { "id": "sign", "text": "GET TO THE FLAG", "size": 10, "x": 160, "y": 150, "stroke": "#5b77b8" }
+      ]
+    },
+    "level2": {
+      "state": { "level": 2, "message": "LEVEL 2" },
+      "camera": { "x": 240, "y": 135 },
+      "entities": [
+        { "id": "player", "shape": "hero", "x": 60, "y": 200, "tags": ["player"], "body": { "friction": 0 } },
+        { "shape": "wide", "x": 60, "y": 240, "tags": ["solid"], "body": { "static": true } },
+        { "shape": "wide", "x": 200, "y": 210, "tags": ["solid"], "body": { "static": true } },
+        { "shape": "wide", "x": 340, "y": 170, "tags": ["solid"], "body": { "static": true } },
+        { "shape": "wide", "x": 480, "y": 130, "tags": ["solid"], "body": { "static": true } },
+        { "shape": "wide", "x": 620, "y": 170, "tags": ["solid"], "body": { "static": true } },
+        { "shape": "wide", "x": 760, "y": 200, "tags": ["solid"], "body": { "static": true } },
+        { "shape": "gem", "x": 340, "y": 145, "tags": ["gem"], "body": { "sensor": true } },
+        { "shape": "gem", "x": 480, "y": 100, "tags": ["gem"], "body": { "sensor": true } },
+        { "id": "goal", "shape": "flag", "x": 770, "y": 164, "tags": ["goal"], "body": { "sensor": true } },
+        { "id": "sign", "text": "MIND THE GAPS", "size": 10, "x": 200, "y": 150, "stroke": "#5b77b8" }
+      ]
+    },
+    "won": {
+      "state": { "level": 3, "message": "" },
+      "camera": { "x": 240, "y": 135 },
+      "entities": [
+        { "id": "title", "text": "YOU MADE IT", "size": 28, "x": 240, "y": 120, "stroke": "#ffcf5a", "width": 2.5 },
+        { "id": "fx", "x": 240, "y": 150, "emitter": { "shape": "spark", "rate": 40, "life": [0.6, 1.4], "speed": [60, 160], "gravity": 200 } }
+      ]
+    }
+  },
+  "keys": { "ArrowLeft": "left", "ArrowRight": "right", "ArrowUp": "jump", " ": "jump", "a": "left", "d": "right", "w": "jump" },
+  "systems": ["motion", "physics", "particles", "lifetime", "rules", { "follow": { "id": "player", "lerp": 0.15 } }],
+  "rules": [
+    { "on": "start", "do": "goto('level1')" },
+    { "on": "scene", "do": "state.toast = state.message; after(1.5, 'hideToast')" },
+    { "on": "hideToast", "do": "state.toast = ''" },
+
+    { "each": "player", "do": [
+      "let dir = (held('right') ? 1 : 0) - (held('left') ? 1 : 0)",
+      "self.vx = self.vx + (dir * 220 - self.vx) * min(1, 12 * dt)",
+      "if (pressed('jump') && self.body.ground) { self.vy = -520; sound('jump'); spawn('dust', {x: self.x, y: self.y + 12, vx: -30, vy: -10, data: {ttl: 0.25}}); spawn('dust', {x: self.x, y: self.y + 12, vx: 30, vy: -10, data: {ttl: 0.25}}) }",
+      "if (!held('jump') && self.vy < -200) self.vy = -200",
+      "if (self.y > 400) { self.x = 60; self.y = 180; self.vx = 0; self.vy = 0; state.falls = (state.falls || 0) + 1 }"
+    ] },
+
+    { "on": "contact", "tags": ["player", "gem"], "do": [
+      "despawn(b); state.gems += 1; sound('gem')",
+      "let fx = spawn(null, {x: b.x, y: b.y, emitter: {shape: 'spark', burst: 10, rate: 0, life: [0.2, 0.5], speed: [40, 120]}, data: {ttl: 0.6}})"
+    ] },
+    { "on": "contact", "tags": ["player", "goal"], "when": "!state.leaving", "do": [
+      "state.leaving = true; sound('win')",
+      "after(0.4, 'next')"
+    ] },
+    { "on": "next", "do": "state.leaving = false; goto(state.level == 1 ? 'level2' : 'won')" },
+
+    { "do": "state.hud = state.level >= 3 ? 'GEMS ' + str(state.gems) : 'LEVEL ' + str(state.level) + '  GEMS ' + str(state.gems) + (state.toast ? '   ' + state.toast : '')" }
+  ]
+}

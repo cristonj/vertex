@@ -1,5 +1,6 @@
 import { parsePath, flatten, bounds } from './path.js';
 import { assertValidScene } from './validate.js';
+import { textPath } from './text.js';
 
 /**
  * A World is plain data: shapes (vector art) + entities (instances) + state.
@@ -28,6 +29,9 @@ export class World {
     this.entities = [];
     this.state = structuredClone(doc.state ?? {});
     this.sounds = structuredClone(doc.sounds ?? {});
+    this.physics = doc.physics ? structuredClone(doc.physics) : undefined;
+    this.scenes = doc.scenes ? structuredClone(doc.scenes) : undefined;
+    this.timers = structuredClone(doc.timers ?? []);   // [{ at, type, ...payload }], fired by Game.step
     this._byId = new Map();
     this.time = 0;
     this.frame = 0;
@@ -95,6 +99,9 @@ export class World {
       width: this.width, height: this.height, background: this.background,
       ...(this.camera ? { camera: { ...this.camera } } : {}),
       ...(Object.keys(this.sounds).length ? { sounds: this.sounds } : {}),
+      ...(this.physics ? { physics: this.physics } : {}),
+      ...(this.scenes ? { scenes: this.scenes } : {}),
+      ...(this.timers.length ? { timers: this.timers } : {}),
       shapes: Object.fromEntries(Object.entries(this.shapes).map(([k, v]) => [k, v.src])),
       entities: this.entities.map((e) => ({ ...e })),
       state: this.state,
@@ -109,13 +116,41 @@ const geomCache = new WeakMap();
  * Effective local geometry of an entity: inline `e.d` (compiled + cached per entity) or the
  * registered shape. Returns a shape-like { polys, bounds, parts? } in local coordinates.
  */
+const textCache = new Map();
+
+/**
+ * Inline geometry of an entity as a `d` string: `e.d`, or `e.text` laid out in the built-in
+ * stroke font (`size` default 16, `align` "center" | "left" | "right", baseline at y = 0).
+ * Returns null for entities that use a named shape.
+ */
+export function inlineD(e) {
+  if (e.d != null) return e.d;
+  if (e.text == null) return null;
+  const key = `${e.size ?? 16}|${e.align ?? 'center'}|${e.text}`;
+  let d = textCache.get(key);
+  if (d === undefined) {
+    d = textPath(String(e.text), e.size ?? 16, { align: e.align ?? 'center' }).parts.map((p) => p.d).join('') || 'M0 0';
+    if (textCache.size > 512) textCache.clear();
+    textCache.set(key, d);
+  }
+  return d;
+}
+
+/** Paint style for inline geometry (text defaults to a white 1.5-unit stroke). */
+export function inlineStyle(e) {
+  return e.d == null && e.text != null
+    ? { fill: 'none', stroke: e.stroke ?? '#fff', width: e.width ?? 1.5 }
+    : { fill: e.fill, stroke: e.stroke, width: e.width };
+}
+
 export function entityGeom(world, e) {
-  if (e.d != null) {
+  const d = inlineD(e);
+  if (d != null) {
     let g = geomCache.get(e);
-    if (!g || g.d !== e.d) {
-      const cmds = parsePath(e.d);
+    if (!g || g.d !== d) {
+      const cmds = parsePath(d);
       const polys = flatten(cmds);
-      g = { d: e.d, cmds, polys, bounds: bounds(polys), pad: (e.width ?? 1) / 2 };
+      g = { d, cmds, polys, bounds: bounds(polys), pad: (inlineStyle(e).width ?? 1) / 2 };
       geomCache.set(e, g);
     }
     return g;

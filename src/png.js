@@ -1,6 +1,6 @@
 // Pure-JS vector rasterizer: world -> PNG. Zero dependencies, runs in Node and browsers.
 // Compression: a pluggable deflate (Node's zlib is wired in by src/node.js); without it,
-// PNGs are written with stored (uncompressed) deflate blocks � valid, just larger.
+// PNGs are written with stored (uncompressed) deflate blocks — valid, just larger.
 // Fills polygons (even-odd scanline) and strokes (thick quads + round joins) with flat color
 // or gradients, using the same coordinates as toSVG. Renders registered shapes, inline
 // entity geometry (e.d), gradient fills, and HUD text via the built-in vector stroke font.
@@ -8,6 +8,7 @@ import { flatten, parsePath } from './path.js';
 import { textPath } from './text.js';
 import { drawList, invert, apply, matScale } from './view.js';
 import { cullRadius } from './render.js';
+import { entityGeom, inlineD, inlineStyle } from './world.js';
 
 const NAMED = {
   black: '#000000', white: '#ffffff', red: '#ff0000', green: '#008000', blue: '#0000ff',
@@ -52,7 +53,7 @@ function ramp(stops, t) {
 
 /**
  * Render a world to a PNG buffer. Default size = world size (1 world unit = 1 pixel);
- * pass width/height to render at any other resolution — vectors stay crisp.
+ * pass width/height to render at any other resolution â€” vectors stay crisp.
  */
 export function toPNG(world, { width = world.width, height = world.height } = {}) {
   width = Math.max(1, Math.round(width));
@@ -63,8 +64,8 @@ export function toPNG(world, { width = world.width, height = world.height } = {}
 
   const sx = width / world.width, sy = height / world.height;
   for (const [e, m] of drawList(world, cullRadius(world))) {
-    const parts = e.d != null
-      ? [{ cmds: parsePath(e.d), fill: e.fill, stroke: e.stroke, width: e.width }]
+    const parts = inlineD(e) != null
+      ? [{ polys: entityGeom(world, e).polys, ...inlineStyle(e) }]
       : world.shapes[e.shape]?.parts;
     if (!parts) continue;
     const T = (x, y) => { const [X, Y] = apply(m, x, y); return [X * sx, Y * sy]; };

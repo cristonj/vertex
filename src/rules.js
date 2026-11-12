@@ -1,3 +1,4 @@
+import { raycast as castRay, nearest as nearestTo, pointQuery } from './physics.js';
 // Vertex Rules: game logic as data. A tiny, safe, deterministic expression language so a
 // complete game — art, scene AND behavior — is one JSON document that any implementation
 // can run (see SPEC.md §6). No eval, no host access: only the builtins below.
@@ -242,6 +243,15 @@ function builtins(game) {
     clamp: (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v),
     lerp: (a, b, t) => a + (b - a) * t,
     str: (v) => String(v),
+    after: (seconds, type, payload = {}) => game.after(seconds, type, payload),
+    goto: (name) => game.goto(name),
+    nearest: (x, y, tag) => nearestTo(w(), x, y, tag),
+    at: (x, y, tag) => pointQuery(w(), x, y, { tag: tag ?? null })[0] ?? null,
+    raycast: (x, y, dx, dy, max, tag) => {
+      const h = castRay(w(), x, y, dx, dy, { max: max ?? Infinity, tag: tag ?? null });
+      return h ? { entity: h.entity, x: h.x, y: h.y, distance: h.distance } : null;
+    },
+    burst: (e, n) => { e = ent(e); if (e?.emitter) e.emitter.burst = (e.emitter.burst ?? 0) + n; },
     len: (v) => (v == null ? 0 : v.length),
   };
 }
@@ -264,7 +274,7 @@ export function compileRules(rules) {
   return function rulesSystem(game, dt) {
     const w = game.world;
     const fns = builtins(game);
-    const vars = { dt, frame: w.frame, time: w.time, state: w.state, W: w.width, H: w.height, PI: Math.PI };
+    const vars = { dt, frame: w.frame, time: w.time, state: w.state, W: w.width, H: w.height, PI: Math.PI, pointer: game.pointer, camera: w.camera ?? null };
     const exec = (r, extra) => {
       const env = { vars: { ...vars, ...extra }, locals: {}, fns };
       if (r._when && !truthy(ev(r._when, env))) return;
@@ -275,7 +285,14 @@ export function compileRules(rules) {
       if (r.on) {
         for (const event of game.events.slice()) {
           if (event.type !== r.on) continue;
-          if (r.on === 'hit') {
+          if (r.on === 'contact' && r.tags) {
+            // contact pairs are unordered: bind a/b so that a has tags[0] and b has tags[1]
+            let a = w.get(event.a), b = w.get(event.b);
+            if (!a || !b) continue;
+            if (!(a.tags.includes(r.tags[0]) && b.tags.includes(r.tags[1]))) [a, b] = [b, a];
+            if (!(a.tags.includes(r.tags[0]) && b.tags.includes(r.tags[1]))) continue;
+            exec(r, { event, a, b });
+          } else if (r.on === 'hit') {
             if (r.tags && (event.tags?.[0] !== r.tags[0] || event.tags?.[1] !== r.tags[1])) continue;
             const a = w.get(event.a), b = w.get(event.b);
             if (!a || !b) continue; // already removed by an earlier rule this step

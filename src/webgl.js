@@ -8,7 +8,7 @@
 import { fanTriangles, strokeTriangles, coverQuad } from './tess.js';
 import { drawList } from './view.js';
 import { cullRadius } from './render.js';
-import { entityGeom } from './world.js';
+import { entityGeom, inlineD, inlineStyle } from './world.js';
 import { parseColor } from './png.js';
 import { textPath } from './text.js';
 import { flatten, parsePath } from './path.js';
@@ -101,15 +101,17 @@ export class WebGLRenderer {
     for (const [e, m] of list) {
       gl.uniform3f(u.m0, m[0], m[2], m[4]);
       gl.uniform3f(u.m1, m[1], m[3], m[5]);
-      if (e.d != null) {
+      const d = inlineD(e);
+      if (d != null) {
         let rec = this.inline.get(e);
-        if (!rec || rec.d !== e.d) {
+        const style = inlineStyle(e);
+        if (!rec || rec.d !== d || rec.part.width !== style.width) {
           if (rec) this.free(rec.mesh);
-          const part = { d: e.d, fill: e.fill, stroke: e.stroke, width: e.width };
-          rec = { d: e.d, part, mesh: this.mesh(part, entityGeom(world, e).polys) };
+          const part = { d, ...style };
+          rec = { d, part, mesh: this.mesh(part, entityGeom(world, e).polys) };
           this.inline.set(e, rec);
         }
-        rec.part.fill = e.fill; rec.part.stroke = e.stroke;
+        rec.part.fill = style.fill; rec.part.stroke = style.stroke;
         this.paint(rec.part, rec.mesh);
         continue;
       }

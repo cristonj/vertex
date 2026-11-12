@@ -16,7 +16,9 @@ export class Game {
     this.pressed = new Set();    // actions pressed this step (edge-triggered)
     this.events = [];            // events emitted this step: { type, ...payload }
     this._seed = seed >>> 0 || 1;
-    this._initialSeed = this._seed; // recordings remember this, so replays rebuild the same game
+    this._initialSeed = this._seed;
+    this.pointer = { x: 0, y: 0 };  // world-space pointer; moved via point(), recorded like keys
+    this._pendingScene = null; // recordings remember this, so replays rebuild the same game
   }
 
   /** Deterministic PRNG (xorshift32) so headless replays match exactly. */
@@ -35,6 +37,34 @@ export class Game {
 
   emit(type, payload = {}) { this.events.push({ type, frame: this.world.frame, ...payload }); }
 
+  /** Move the pointer (mouse/touch) to world coordinates. Press/release it as the "pointer" action. */
+  point(x, y) { this.pointer.x = x; this.pointer.y = y; }
+
+  /** Fire a `type` event `seconds` from now (stored in the world, so it survives save/rewind). */
+  after(seconds, type, payload = {}) {
+    this.world.timers.push({ at: this.world.time + seconds, type, ...payload });
+  }
+
+  /**
+   * Switch to a named scene from world.scenes at the end of this step: entities are replaced,
+   * `state` keys from the scene are merged in, camera replaced if given, `state.scene` set.
+   */
+  goto(name) {
+    if (!this.world.scenes?.[name]) throw new Error(`unknown scene "${name}"`);
+    this._pendingScene = name;
+  }
+
+  _applyScene(name) {
+    const w = this.world, sc = w.scenes[name];
+    for (const e of [...w.entities]) w.despawn(e);
+    for (const e of sc.entities ?? []) w.spawn(e);
+    if (sc.state) Object.assign(w.state, structuredClone(sc.state));
+    if (sc.camera) w.camera = { zoom: 1, rot: 0, ...sc.camera };
+    w.timers = [];
+    w.state.scene = name;
+    this.emit('scene', { name });
+  }
+
   press(action) { if (!this.input.has(action)) this.pressed.add(action); this.input.add(action); }
   release(action) { this.input.delete(action); }
 
@@ -43,7 +73,16 @@ export class Game {
     const all = [];
     for (let i = 0; i < n; i++) {
       this.events = [];
+      const w = this.world;
+      if (w.timers.length) { // due timers fire first, in creation order
+        const due = w.timers.filter((t) => t.at <= w.time + 1e-9);
+        if (due.length) {
+          w.timers = w.timers.filter((t) => t.at > w.time + 1e-9);
+          for (const { at, ...ev } of due) this.emit(ev.type, ev);
+        }
+      }
       for (const s of this.systems) s(this, this.dt);
+      if (this._pendingScene) { const n = this._pendingScene; this._pendingScene = null; this._applyScene(n); }
       this.world.time += this.dt;
       this.world.frame++;
       this.pressed.clear();
@@ -62,7 +101,7 @@ export class Game {
     const w = this.world;
     return {
       world: structuredClone(w.toJSON()), frame: w.frame, time: w.time, nextId: w._nextId,
-      seed: this._seed, input: [...this.input], pressed: [...this.pressed],
+      seed: this._seed, input: [...this.input], pressed: [...this.pressed], pointer: { ...this.pointer },
     };
   }
 
@@ -72,6 +111,7 @@ export class Game {
     this._seed = st.seed;
     this.input = new Set(st.input);
     this.pressed = new Set(st.pressed);
+    this.pointer = { x: 0, y: 0, ...st.pointer };
     return this;
   }
 

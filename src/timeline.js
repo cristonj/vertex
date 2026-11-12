@@ -8,7 +8,7 @@
 // entity.data), not in closures. If a game breaks the rule, pass { checkpoints: false }
 // and every seek re-simulates from frame 0 with a fresh game from `factory` — slower, always right.
 
-import { digest } from './replay.js';
+import { digest, applyInput } from './replay.js';
 
 export class Timeline {
   /**
@@ -33,6 +33,11 @@ export class Timeline {
   /** Input that also truncates the future (acting in the past starts a new timeline). */
   press(action) { this._truncate(); if (!this.game.input.has(action)) this.inputs.push([this.frame, 'p', action]); this.game.press(action); }
   release(action) { this._truncate(); if (this.game.input.has(action)) this.inputs.push([this.frame, 'r', action]); this.game.release(action); }
+  point(x, y) {
+    this._truncate();
+    if (x !== this.game.pointer.x || y !== this.game.pointer.y) this.inputs.push([this.frame, 'm', x, y]);
+    this.game.point(x, y);
+  }
 
   _truncate() {
     if (this.frame >= this.head) return;
@@ -59,10 +64,7 @@ export class Timeline {
   }
 
   _applyInputsAt(f) {
-    for (const [fr, kind, action] of this.inputs) {
-      if (fr !== f) continue;
-      if (kind === 'p') this.game.press(action); else this.game.release(action);
-    }
+    for (const inp of this.inputs) if (inp[0] === f) applyInput(this.game, inp);
   }
 
   /** Jump to any frame in [0, head]. Uses the nearest checkpoint at or before it. */
@@ -114,7 +116,7 @@ export function divergence(factory, recA, recB) {
   const a = factory({ seed: recA.seed, fps: recA.fps }), b = factory({ seed: recB.seed, fps: recB.fps });
   const ia = [...recA.inputs], ib = [...recB.inputs];
   const steps = Math.min(recA.steps, recB.steps);
-  const apply = (g, list, f) => { while (list.length && list[0][0] === f) { const [, k, act] = list.shift(); if (k === 'p') g.press(act); else g.release(act); } };
+  const apply = (g, list, f) => { while (list.length && list[0][0] === f) applyInput(g, list.shift()); };
   for (let f = 0; f < steps; f++) {
     apply(a, ia, f); apply(b, ib, f);
     a.step(1); b.step(1);
