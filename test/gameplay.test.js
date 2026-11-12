@@ -70,7 +70,7 @@ test('Ascent: scripted play completes level 1 via physics, contacts, timers and 
   const g = loadCartridge(doc, { seed: 1 });
   let hold = 0;
   const scenes = [];
-  for (let f = 0; f < 900 && g.world.state.level < 2; f++) {
+  for (let f = 0; f < 900 && !scenes.includes('level2'); f++) {
     const p = g.world.get('player'), goal = g.world.get('goal');
     if (!p) { for (const e of g.step(1)) if (e.type === 'scene') scenes.push(e.name); continue; }
     if (goal && goal.x > p.x + 4) g.press('right'); else g.release('right');
@@ -129,7 +129,8 @@ test('scenes: goto swaps entities at end of step, merges state, emits scene', ()
   assert.equal(g.world.state.sameStep, true);
   assert.deepEqual(g.world.entities.map((e) => e.id), ['new']);
   assert.deepEqual([g.world.state.keep, g.world.state.level, g.world.state.scene], [1, 2, 'two']);
-  assert.ok(evs.some((e) => e.type === 'scene' && e.name === 'two'));
+  assert.ok(!evs.some((e) => e.type === 'scene'), 'delivered next step, not after rules ran');
+  assert.ok(g.step(1).some((e) => e.type === 'scene' && e.name === 'two'));
   assert.throws(() => g.goto('nope'), /unknown scene/);
 });
 

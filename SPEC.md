@@ -130,8 +130,9 @@ Inline geometry has radius from its own `d` and pad `(width ?? 1) / 2`.
   `(type, {type, ...payload})`, in list order.
 - `goto(name)` requests a scene change (error if `scenes[name]` is absent); the last request in a
   step wins. At step (4): despawn every entity, spawn the scene's entities in order, merge a copy of
-  the scene's `state` into `state`, replace `camera` if the scene has one, clear `timers`, set
-  `state.scene = name`, and emit `scene {name}`.
+  the scene's `state` into `state`, replace `camera` if the scene has one, set `state.scene = name`,
+  and replace `timers` with `[{at: time, type: "scene", name}]` so the `scene` event is delivered
+  at the start of the next step (before any system runs).
 - **Input** is named actions. `press(a)`: if `a` is not held, add it to `pressed`; add it to `held`.
   `release(a)`: remove it from `held`. Input is applied between steps.
 - **Pointer**: a world-space point `{x, y}` (initially 0, 0) set by `point(x, y)`; its button is

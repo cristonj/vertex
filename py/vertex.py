@@ -1159,9 +1159,8 @@ class Game:
             w.state.update(json.loads(json.dumps(sc['state'])))
         if sc.get('camera'):
             w.camera = dict({'zoom': 1, 'rot': 0}, **sc['camera'])
-        w.timers = []
         w.state['scene'] = name
-        self.emit('scene', {'name': name})
+        w.timers = [{'at': w.time, 'type': 'scene', 'name': name}]
 
     def random(self):
         x = self.seed

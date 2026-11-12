@@ -60,9 +60,9 @@ export class Game {
     for (const e of sc.entities ?? []) w.spawn(e);
     if (sc.state) Object.assign(w.state, structuredClone(sc.state));
     if (sc.camera) w.camera = { zoom: 1, rot: 0, ...sc.camera };
-    w.timers = [];
     w.state.scene = name;
-    this.emit('scene', { name });
+    // Delivered at the start of the next step (as an already-due timer), so rules see it.
+    w.timers = [{ at: w.time, type: 'scene', name }];
   }
 
   press(action) { if (!this.input.has(action)) this.pressed.add(action); this.input.add(action); }

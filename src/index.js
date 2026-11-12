@@ -4,7 +4,7 @@ export { World, entityGeom } from './world.js';
 export { Game } from './engine.js';
 export { toSVG, CanvasRenderer } from './render.js';
 export * as systems from './systems.js';
-export { bindKeys } from './input.js';
+export { bindKeys, bindPointer, bindGamepad, touchControls, isTouchDevice, GAMEPAD_DEFAULTS } from './input.js';
 export { checkScene, assertValidScene } from './validate.js';
 export { Recorder, applyRecording, applyInput, verifyReplay, digest, hash64 } from './replay.js';
 export { toPNG, parseColor, encodePNG, setDeflate } from './png.js';
