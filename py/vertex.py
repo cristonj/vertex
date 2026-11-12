@@ -23,8 +23,35 @@ from decimal import Decimal, ROUND_HALF_UP
 
 # --------------------------------------------------------------------------- numbers
 
+class _Undefined(object):
+    """JavaScript's undefined (missing fields), distinct from null (None)."""
+    __slots__ = ()
+
+    def __repr__(self):
+        return 'undefined'
+
+    def __bool__(self):
+        return False
+
+
+UNDEF = _Undefined()
+
+
+def arith(v):
+    """ToNumber for arithmetic: null -> 0, undefined -> NaN, booleans -> 0/1."""
+    if v is None:
+        return 0
+    if v is UNDEF:
+        return math.nan
+    if v is True or v is False:
+        return int(v)
+    return v
+
+
 def js_str(x):
     """Format a value exactly like JavaScript's String(x)."""
+    if x is UNDEF:
+        return 'undefined'
     if x is True:
         return 'true'
     if x is False:
@@ -95,7 +122,7 @@ def to_fixed(x, d):
 
 
 def js_truthy(v):
-    if v is None or v is False:
+    if v is None or v is False or v is UNDEF:
         return False
     if isinstance(v, (int, float)) and not isinstance(v, bool):
         return not (v == 0 or v != v)
@@ -243,6 +270,18 @@ def flatten(cmds, steps=8):
     return polys
 
 
+def bounds_box(polys):
+    x0 = y0 = math.inf
+    x1 = y1 = -math.inf
+    for p in polys:
+        for x, y in p:
+            if x < x0: x0 = x
+            if y < y0: y0 = y
+            if x > x1: x1 = x
+            if y > y1: y1 = y
+    return x0, y0, x1, y1
+
+
 def bounds_radius(polys):
     r2_ = 0.0
     for p in polys:
@@ -265,6 +304,8 @@ class Shape:
         for p in self.parts:
             polys += flatten(parse_path(p['d']))
         self.radius = bounds_radius(polys)
+        self.box = bounds_box(polys)
+        self.polys = polys
         self.pad = max([0.0] + [(p.get('width', 1)) / 2 for p in self.parts if p.get('stroke') and p.get('stroke') != 'none'])
 
 
@@ -277,6 +318,9 @@ class World:
         self.shapes = {k: Shape(v) for k, v in (doc.get('shapes') or {}).items()}
         self.state = json.loads(json.dumps(doc.get('state') or {}))
         self.sounds = doc.get('sounds') or {}
+        self.physics = doc.get('physics')
+        self.scenes = doc.get('scenes')
+        self.timers = json.loads(json.dumps(doc.get('timers') or []))
         self.entities = []
         self.by_id = {}
         self.time = 0.0
@@ -325,16 +369,24 @@ class World:
     def query(self, tag):
         return [e for e in self.entities if tag in e['tags']]
 
+    def full_geom(self, e):
+        """(radius, pad, box, polys) in local coordinates, for named or inline geometry."""
+        d = inline_d(e)
+        if d is not None:
+            g = self._inline.get(id(e))
+            if not g or g[0] != d:
+                polys = flatten(parse_path(d))
+                width = inline_style(e).get('width')
+                g = (d, bounds_radius(polys), (1 if width is None else width) / 2, bounds_box(polys), polys)
+                self._inline[id(e)] = g
+            return g[1], g[2], g[3], g[4]
+        s = self.shapes.get(e.get('shape'))
+        return (s.radius, s.pad, s.box, s.polys) if s else (0.0, 0.0, (0.0, 0.0, 0.0, 0.0), [])
+
     def geom(self, e):
         """(local radius, stroke pad) for an entity."""
-        if e.get('d') is not None:
-            g = self._inline.get(id(e))
-            if not g or g[0] != e['d']:
-                g = (e['d'], bounds_radius(flatten(parse_path(e['d']))), (e.get('width', 1)) / 2)
-                self._inline[id(e)] = g
-            return g[1], g[2]
-        s = self.shapes.get(e.get('shape'))
-        return (s.radius, s.pad) if s else (0.0, 0.0)
+        g = self.full_geom(e)
+        return g[0], g[1]
 
     def radius(self, e):
         return self.geom(e)[0] * e['scale']
@@ -546,15 +598,15 @@ def run_stmt(node, env):
             raise RuleError('rules: cannot set "%s"' % key)
         if key in FORBIDDEN:
             raise RuleError('rules: forbidden field "%s"' % key)
-        cur = obj.get(key) if isinstance(obj, dict) else obj[key]
+        cur = obj.get(key, UNDEF) if isinstance(obj, dict) else obj[key]
         if op == '=':
             res = v
         elif op == '+=':
             res = js_add(cur, v)
         elif op == '-=':
-            res = cur - v
+            res = arith(cur) - arith(v)
         elif op == '*=':
-            res = cur * v
+            res = arith(cur) * arith(v)
         else:
             res = js_div(cur, v)
         obj[key] = res
@@ -565,10 +617,13 @@ def run_stmt(node, env):
 def js_add(a, b):
     if isinstance(a, str) or isinstance(b, str):
         return js_str(a) + js_str(b)
-    return a + b
+    return arith(a) + arith(b)
 
 
 def js_div(a, b):
+    a, b = arith(a), arith(b)
+    if a != a or b != b:
+        return math.nan
     if b == 0:
         if a == 0 or a != a:
             return math.nan
@@ -577,6 +632,8 @@ def js_div(a, b):
 
 
 def js_eq(a, b):
+    if a is UNDEF or b is UNDEF:
+        return a is b
     if isinstance(a, bool) or isinstance(b, bool):
         return a is b
     if isinstance(a, (int, float)) and isinstance(b, (int, float)):
@@ -602,14 +659,14 @@ def ev(node, env):
         if p in FORBIDDEN:
             raise RuleError('rules: forbidden field "%s"' % p)
         if isinstance(o, dict):
-            return o.get(p)
+            return o.get(p, UNDEF)
         if isinstance(o, list):
             if p == 'length':
                 return len(o)
-            return o[p] if isinstance(p, int) and 0 <= p < len(o) else None
+            return o[p] if isinstance(p, int) and 0 <= p < len(o) else UNDEF
         if isinstance(o, str):
-            return len(o) if p == 'length' else None
-        return None
+            return len(o) if p == 'length' else UNDEF
+        return UNDEF
     if k == 'call':
         f = env['fns'].get(node[1])
         if f is None:
@@ -617,7 +674,7 @@ def ev(node, env):
         return f(*[ev(a, env) for a in node[2]])
     if k == 'un':
         a = ev(node[2], env)
-        return -a if node[1] == '-' else not js_truthy(a)
+        return -arith(a) if node[1] == '-' else not js_truthy(a)
     if k == 'cond':
         return ev(node[2], env) if js_truthy(ev(node[1], env)) else ev(node[3], env)
     if k == 'arr':
@@ -637,12 +694,15 @@ def ev(node, env):
             a = ev(node[2], env); return a if js_truthy(a) else ev(node[3], env)
         a, b = ev(node[2], env), ev(node[3], env)
         if op == '+': return js_add(a, b)
+        if op == '==': return js_eq(a, b)
+        if op == '!=': return not js_eq(a, b)
+        if isinstance(a, str) and isinstance(b, str) and op in ('<', '<=', '>', '>='):
+            return {'<': a < b, '<=': a <= b, '>': a > b, '>=': a >= b}[op]
+        a, b = arith(a), arith(b)
         if op == '-': return a - b
         if op == '*': return a * b
         if op == '/': return js_div(a, b)
-        if op == '%': return math.fmod(a, b) if b != 0 else math.nan
-        if op == '==': return js_eq(a, b)
-        if op == '!=': return not js_eq(a, b)
+        if op == '%': return math.fmod(a, b) if b != 0 and a == a and b == b else math.nan
         if op == '<': return a < b
         if op == '<=': return a <= b
         if op == '>': return a > b
@@ -689,6 +749,11 @@ def builtins(game):
         if e:
             e['tags'] = [x for x in e['tags'] if x != t]
 
+    def burst(e, n):
+        e = ent(e)
+        if e and e.get('emitter'):
+            e['emitter']['burst'] = (e['emitter'].get('burst') or 0) + n
+
     def dist(a, b):
         a, b = ent(a), ent(b)
         return math.sqrt((a['x'] - b['x']) ** 2 + (a['y'] - b['y']) ** 2)
@@ -714,7 +779,11 @@ def builtins(game):
         'clamp': lambda v, lo, hi: lo if v < lo else hi if v > hi else v,
         'lerp': lambda a, b, t: a + (b - a) * t,
         'str': js_str,
-        'len': lambda v: 0 if v is None else len(v),
+        'len': lambda v: 0 if v is None or v is UNDEF else len(v),
+        'after': lambda sec, t, p=None: game.after(sec, t, p),
+        'goto': lambda n: game.goto(n),
+        'nearest': lambda x, y, t: nearest(w(), x, y, t),
+        'burst': burst,
     }
 
 
@@ -733,7 +802,8 @@ def compile_rules(rules):
     def system(game, dt):
         w = game.world
         fns = builtins(game)
-        base = {'dt': dt, 'frame': w.frame, 'time': w.time, 'state': w.state, 'W': w.width, 'H': w.height, 'PI': math.pi}
+        base = {'dt': dt, 'frame': w.frame, 'time': w.time, 'state': w.state, 'W': w.width, 'H': w.height, 'PI': math.pi,
+                'pointer': game.pointer, 'camera': w.camera}
 
         def execute(r, prog, when, extra):
             env = {'vars': dict(base, **extra), 'locals': {}, 'fns': fns}
@@ -751,7 +821,17 @@ def compile_rules(rules):
                 for event in list(game.events):
                     if event['type'] != on:
                         continue
-                    if on == 'hit':
+                    if on == 'contact' and r.get('tags'):
+                        a, b = w.get(event.get('a')), w.get(event.get('b'))
+                        if not a or not b:
+                            continue
+                        t0, t1 = r['tags']
+                        if not (t0 in a['tags'] and t1 in b['tags']):
+                            a, b = b, a
+                        if not (t0 in a['tags'] and t1 in b['tags']):
+                            continue
+                        execute(r, prog, when, {'event': event, 'a': a, 'b': b})
+                    elif on == 'hit':
                         tags = r.get('tags')
                         et = event.get('tags') or [None, None]
                         if tags and (et[0] != tags[0] or et[1] != tags[1]):
@@ -818,7 +898,228 @@ def sys_collide(pairs):
     return system
 
 
-SYSTEMS = {'motion': lambda _: sys_motion, 'wrap': lambda _: sys_wrap, 'lifetime': lambda _: sys_lifetime, 'collide': sys_collide}
+def nearest(world, x, y, tag):
+    best, bd = None, math.inf
+    for e in world.query(tag):
+        d = (e['x'] - x) * (e['x'] - x) + (e['y'] - y) * (e['y'] - y)
+        if d < bd:
+            bd, best = d, e
+    return best
+
+
+def collider(world, e):
+    radius, _, box, _ = world.full_geom(e)
+    s = abs(e['scale'])
+    if (e['body'].get('collider') or 'box') == 'circle':
+        r = radius * s
+        return {'circle': True, 'r': r, 'x0': e['x'] - r, 'y0': e['y'] - r, 'x1': e['x'] + r, 'y1': e['y'] + r}
+    if box[0] == math.inf:
+        box = (0.0, 0.0, 0.0, 0.0)
+    return {'circle': False, 'x0': e['x'] + box[0] * s, 'y0': e['y'] + box[1] * s,
+            'x1': e['x'] + box[2] * s, 'y1': e['y'] + box[3] * s}
+
+
+def contact(A, B):
+    if A['x1'] <= B['x0'] or B['x1'] <= A['x0'] or A['y1'] <= B['y0'] or B['y1'] <= A['y0']:
+        return None
+    if A['circle'] and B['circle']:
+        ax, ay = (A['x0'] + A['x1']) / 2, (A['y0'] + A['y1']) / 2
+        bx, by = (B['x0'] + B['x1']) / 2, (B['y0'] + B['y1']) / 2
+        dx, dy = bx - ax, by - ay
+        d2, rr = dx * dx + dy * dy, A['r'] + B['r']
+        if d2 >= rr * rr:
+            return None
+        d = math.sqrt(d2)
+        return (dx / d, dy / d, rr - d) if d > 0 else (0, 1, rr)
+    if A['circle'] or B['circle']:
+        flip = bool(B['circle']) and not A['circle']
+        C, R = (B, A) if flip else (A, B)
+        cx, cy = (C['x0'] + C['x1']) / 2, (C['y0'] + C['y1']) / 2
+        px = R['x0'] if cx < R['x0'] else R['x1'] if cx > R['x1'] else cx
+        py = R['y0'] if cy < R['y0'] else R['y1'] if cy > R['y1'] else cy
+        dx, dy = px - cx, py - cy
+        d2 = dx * dx + dy * dy
+        if d2 > 0:
+            if d2 >= C['r'] * C['r']:
+                return None
+            d = math.sqrt(d2)
+            nx, ny, depth = dx / d, dy / d, C['r'] - d
+        else:
+            l, r_, t, b = cx - R['x0'], R['x1'] - cx, cy - R['y0'], R['y1'] - cy
+            m = min(l, r_, t, b)
+            if m == l:
+                nx, ny = 1, 0
+            elif m == r_:
+                nx, ny = -1, 0
+            elif m == t:
+                nx, ny = 0, 1
+            else:
+                nx, ny = 0, -1
+            depth = m + C['r']
+        return (-nx, -ny, depth) if flip else (nx, ny, depth)
+    ox = min(A['x1'], B['x1']) - max(A['x0'], B['x0'])
+    oy = min(A['y1'], B['y1']) - max(A['y0'], B['y0'])
+    if ox < oy:
+        return (1 if (A['x0'] + A['x1']) < (B['x0'] + B['x1']) else -1, 0, ox)
+    return (0, 1 if (A['y0'] + A['y1']) < (B['y0'] + B['y1']) else -1, oy)
+
+
+def sys_physics(game, dt):
+    # Mirrors src/physics.js. Brute-force pairs (i < j) visit the same pairs, in the same
+    # order, as the reference's grid broadphase (only overlapping AABBs can make contact).
+    w = game.world
+    cfg = w.physics or {}
+    grav = cfg.get('gravity') or [0, 900]
+    gx, gy = grav[0], grav[1]
+    iterations, slop = cfg.get('iterations', 4), cfg.get('slop', 0.01)
+    bodies = [e for e in w.entities if e.get('body')]
+    for e in bodies:
+        b = e['body']
+        b['ground'] = False
+        b['wall'] = 0
+        if not b.get('static') and not b.get('sensor'):
+            k = b.get('gravity', 1)
+            e['vx'] += gx * k * dt
+            e['vy'] += gy * k * dt
+    if len(bodies) < 2:
+        return
+    reported = set()
+    for _ in range(iterations):
+        cols = [collider(w, e) for e in bodies]
+        any_ = False
+        for i in range(len(bodies)):
+            for j in range(i + 1, len(bodies)):
+                a, b = bodies[i], bodies[j]
+                ba, bb = a['body'], b['body']
+                if (ba.get('static') or ba.get('sensor')) and (bb.get('static') or bb.get('sensor')):
+                    continue
+                c = contact(cols[i], cols[j])
+                if not c:
+                    continue
+                nx, ny, depth = c
+                if (i, j) not in reported:
+                    reported.add((i, j))
+                    game.emit('contact', {'a': a['id'], 'b': b['id'], 'nx': nx, 'ny': ny})
+                if ba.get('sensor') or bb.get('sensor'):
+                    continue
+                any_ = True
+                ia = 0 if ba.get('static') else 1 / ba.get('mass', 1)
+                ib = 0 if bb.get('static') else 1 / bb.get('mass', 1)
+                sm = ia + ib
+                corr = max(depth - slop, 0) / sm
+                a['x'] -= nx * corr * ia
+                a['y'] -= ny * corr * ia
+                b['x'] += nx * corr * ib
+                b['y'] += ny * corr * ib
+                if ny > 0.5:
+                    ba['ground'] = True
+                if ny < -0.5:
+                    bb['ground'] = True
+                if nx > 0.5:
+                    ba['wall'] = 1
+                    bb['wall'] = -1
+                elif nx < -0.5:
+                    ba['wall'] = -1
+                    bb['wall'] = 1
+                rvx, rvy = b['vx'] - a['vx'], b['vy'] - a['vy']
+                vn = rvx * nx + rvy * ny
+                if vn >= 0:
+                    continue
+                rest = max(ba.get('restitution', 0), bb.get('restitution', 0))
+                jn = (-(1 + rest) * vn) / sm
+                a['vx'] -= jn * nx * ia
+                a['vy'] -= jn * ny * ia
+                b['vx'] += jn * nx * ib
+                b['vy'] += jn * ny * ib
+                mu = math.sqrt(ba.get('friction', 0) * bb.get('friction', 0))
+                if mu > 0:
+                    tx, ty = -ny, nx
+                    vt = (b['vx'] - a['vx']) * tx + (b['vy'] - a['vy']) * ty
+                    jt = -vt / sm
+                    lim = jn * mu
+                    if jt > lim:
+                        jt = lim
+                    elif jt < -lim:
+                        jt = -lim
+                    a['vx'] -= jt * tx * ia
+                    a['vy'] -= jt * ty * ia
+                    b['vx'] += jt * tx * ib
+                    b['vy'] += jt * ty * ib
+        if not any_:
+            break
+
+
+def sys_follow(arg):
+    eid, lerp = (arg, 1) if isinstance(arg, str) else (arg['id'], arg.get('lerp', 1))
+
+    def system(game, dt):
+        w = game.world
+        t = w.get(eid)
+        if not t:
+            return
+        if w.camera is None:
+            w.camera = {'x': w.width / 2, 'y': w.height / 2, 'zoom': 1, 'rot': 0}
+        k = 1 if lerp >= 1 else 1 - math.pow(1 - lerp, dt * 60)  # pow: implementation-tolerant
+        w.camera['x'] += (t['x'] - w.camera['x']) * k
+        w.camera['y'] += (t['y'] - w.camera['y']) * k
+    return system
+
+
+def _pick(game, r, dflt):
+    if r is None:
+        return dflt
+    if isinstance(r, (int, float)):
+        return r
+    return r[0] + game.random() * (r[1] - r[0])
+
+
+def sys_particles(game, dt):
+    # Mirrors src/particles.js (implementation-tolerant: uses sin/cos).
+    w = game.world
+    for p in w.entities:
+        pd = p['data'].get('particle')
+        if not pd:
+            continue
+        if pd.get('gravity'):
+            p['vy'] += pd['gravity'] * dt
+        if pd.get('shrink') and pd['life'] > 0:
+            p['scale'] = pd['scale0'] * max(0, p['data']['ttl'] / pd['life'])
+    for e in list(w.entities):
+        em = e.get('emitter')
+        if not em:
+            continue
+        em['acc'] = (em.get('acc') or 0) + (em.get('rate') or 0) * dt
+        n = math.floor(em['acc']) + (em.get('burst') or 0)
+        em['acc'] -= math.floor(em['acc'])
+        em['burst'] = 0
+        if em.get('max'):
+            live = len(w.query('fx:' + js_str(e['id'])))
+            n = min(n, max(0, em['max'] - live))
+        for _ in range(int(n)):
+            life = _pick(game, em.get('life'), 0.5)
+            speed = _pick(game, em.get('speed'), 60)
+            angle = _pick(game, em.get('angle'), None)
+            if angle is None:
+                angle = game.random() * math.pi * 2
+            angle += e['rot'] if em.get('relative') else 0
+            scale = _pick(game, em.get('scale'), 1)
+            fields = {'shape': em.get('shape'), 'd': em.get('d'), 'text': em.get('text'), 'fill': em.get('fill'),
+                      'stroke': em.get('stroke'), 'width': em.get('width'), 'x': e['x'], 'y': e['y'], 'rot': angle,
+                      'scale': scale, 'layer': em.get('layer', e.get('layer')),
+                      'vx': math.cos(angle) * speed + (e['vx'] if em.get('inherit') else 0),
+                      'vy': math.sin(angle) * speed + (e['vy'] if em.get('inherit') else 0),
+                      'drag': em.get('drag'), 'vr': _pick(game, em.get('spin'), 0),
+                      'tags': list(em.get('tags') or []) + ['particle', 'fx:' + js_str(e['id'])],
+                      'data': {'ttl': life, 'particle': {'life': life, 'scale0': scale,
+                                                         'shrink': em.get('shrink') is not False,
+                                                         'gravity': em.get('gravity', 0)}}}
+            w.spawn(dict((k, v) for k, v in fields.items() if v is not None or k == 'shape'))
+
+
+SYSTEMS = {'motion': lambda _: sys_motion, 'wrap': lambda _: sys_wrap, 'lifetime': lambda _: sys_lifetime,
+           'collide': sys_collide, 'physics': lambda _: sys_physics, 'follow': sys_follow,
+           'particles': lambda _: sys_particles}
+
 
 # --------------------------------------------------------------------------- game
 
@@ -830,6 +1131,37 @@ class Game:
         self.input, self.pressed, self.events = set(), set(), []
         self.seed = (int(seed) & 0xffffffff) or 1
         self.initial_seed = self.seed
+        self.pointer = {'x': 0, 'y': 0}
+        self.pending_scene = None
+
+    def point(self, x, y):
+        self.pointer['x'] = x
+        self.pointer['y'] = y
+
+    def after(self, seconds, typ, payload=None):
+        t = {'at': self.world.time + seconds, 'type': typ}
+        t.update(payload or {})
+        self.world.timers.append(t)
+
+    def goto(self, name):
+        if not (self.world.scenes or {}).get(name):
+            raise RuleError('unknown scene "%s"' % name)
+        self.pending_scene = name
+
+    def apply_scene(self, name):
+        w = self.world
+        sc = w.scenes[name]
+        for e in list(w.entities):
+            w.despawn(e)
+        for e in sc.get('entities') or []:
+            w.spawn(e)
+        if sc.get('state'):
+            w.state.update(json.loads(json.dumps(sc['state'])))
+        if sc.get('camera'):
+            w.camera = dict({'zoom': 1, 'rot': 0}, **sc['camera'])
+        w.timers = []
+        w.state['scene'] = name
+        self.emit('scene', {'name': name})
 
     def random(self):
         x = self.seed
@@ -859,8 +1191,20 @@ class Game:
         out = []
         for _ in range(n):
             self.events = []
+            w = self.world
+            if w.timers:
+                due = [t for t in w.timers if t['at'] <= w.time + 1e-9]
+                if due:
+                    w.timers = [t for t in w.timers if t['at'] > w.time + 1e-9]
+                    for t in due:
+                        ev_ = dict((k, v) for k, v in t.items() if k != 'at')
+                        self.emit(ev_['type'], ev_)
             for s in self.systems:
                 s(self, self.dt)
+            if self.pending_scene:
+                name = self.pending_scene
+                self.pending_scene = None
+                self.apply_scene(name)
             self.world.time += self.dt
             self.world.frame += 1
             self.pressed.clear()
@@ -908,11 +1252,12 @@ def r1(n):
     return js_round(n * 10) / 10
 
 
-def text_parts(s, size=16, spacing=2):
+def text_parts(s, size=16, spacing=2, align='left'):
     sc = size / 6
     adv = (4 + spacing) * sc
     parts = []
-    x0 = 0.0
+    wdt = text_width(s, size, spacing)
+    x0 = -wdt / 2 if align == 'center' else -wdt if align == 'right' else 0.0
     for ch in s.upper():
         glyph = FONT.get(ch)
         if glyph:
@@ -923,6 +1268,28 @@ def text_parts(s, size=16, spacing=2):
                 parts.append(d)
         x0 += adv
     return parts
+
+
+_text_cache = {}
+
+
+def inline_d(e):
+    if e.get('d') is not None:
+        return e['d']
+    if e.get('text') is None:
+        return None
+    key = (e.get('size', 16), e.get('align', 'center'), js_str(e['text']))
+    d = _text_cache.get(key)
+    if d is None:
+        d = ''.join(text_parts(js_str(e['text']), e.get('size', 16), 2, e.get('align', 'center'))) or 'M0 0'
+        _text_cache[key] = d
+    return d
+
+
+def inline_style(e):
+    if e.get('d') is None and e.get('text') is not None:
+        return {'fill': 'none', 'stroke': e.get('stroke', '#fff'), 'width': e.get('width', 1.5)}
+    return {'fill': e.get('fill'), 'stroke': e.get('stroke'), 'width': e.get('width')}
 
 
 def esc(s):
@@ -1022,9 +1389,10 @@ def to_svg(world, hud=True, cull=True):
         else:
             t = 'translate(%s %s) rotate(%s) scale(%s)' % (js_str(r2(e['x'])), js_str(r2(e['y'])),
                                                            js_str(r2(e['rot'] * 180 / math.pi)), js_str(r2(e['scale'])))
-        if e.get('d') is not None:
-            p = {'d': e['d'], 'fill': e.get('fill'), 'stroke': e.get('stroke'), 'width': e.get('width')}
-            uses += '<path data-id="%s" d="%s" %s transform="%s"/>' % (e['id'], esc(e['d']), part_attrs(p, 'e-' + js_str(e['id']), defs_extra), t)
+        d = inline_d(e)
+        if d is not None:
+            p = dict(inline_style(e), d=d)
+            uses += '<path data-id="%s" d="%s" %s transform="%s"/>' % (e['id'], esc(d), part_attrs(p, 'e-' + js_str(e['id']), defs_extra), t)
         elif e.get('shape'):
             uses += '<use href="#%s" data-id="%s" transform="%s"/>' % (e['shape'], e['id'], t)
     hud_svg = ''
@@ -1054,16 +1422,22 @@ def digest(game):
     return hash64(game.to_svg())
 
 
+def apply_input(game, inp):
+    if inp[1] == 'p':
+        game.press(inp[2])
+    elif inp[1] == 'r':
+        game.release(inp[2])
+    elif inp[1] == 'm':
+        game.point(inp[2], inp[3])
+
+
 def apply_recording(game, rec):
     inputs = rec['inputs']
     i = 0
     for f in range(rec['steps']):
         while i < len(inputs) and inputs[i][0] == f:
-            _, kind, action = inputs[i]; i += 1
-            if kind == 'p':
-                game.press(action)
-            else:
-                game.release(action)
+            apply_input(game, inputs[i])
+            i += 1
         game.step(1)
     return game
 
@@ -1076,7 +1450,9 @@ def conform(path):
         suite = json.load(fh)
     root = os.path.dirname(os.path.dirname(os.path.abspath(path)))
     passed = failed = 0
+    ext = {'passed': 0, 'failed': 0}
     for case in suite['cases']:
+        level = case.get('level', 'core')
         with open(os.path.join(root, case['cartridge']), encoding='utf-8') as fh:
             g = load_cartridge(json.load(fh), case['seed'], case.get('fps', 60))
         want = dict((f, d) for f, d in case['digests'])
@@ -1084,18 +1460,23 @@ def conform(path):
         last = max(want)
         for f in range(last):
             while i < len(inputs) and inputs[i][0] == f:
-                _, k, act = inputs[i]; i += 1
-                g.press(act) if k == 'p' else g.release(act)
+                apply_input(g, inputs[i])
+                i += 1
             g.step(1)
             fr = g.world.frame
             if fr in want:
                 got = digest(g)
-                if got == want[fr]:
+                ok = got == want[fr]
+                if level != 'core':
+                    ext['passed' if ok else 'failed'] += 1
+                elif ok:
                     passed += 1
                 else:
                     failed += 1
                     print('FAIL %s seed %d frame %d: %s != %s' % (case['cartridge'], case['seed'], fr, got, want[fr]))
-    print('conformance (%s): %d passed, %d failed' % (suite.get('level', 'core'), passed, failed))
+    print('conformance (core): %d passed, %d failed' % (passed, failed))
+    if ext['passed'] or ext['failed']:
+        print('extended (implementation-tolerant, informative): %d matched, %d differed' % (ext['passed'], ext['failed']))
     return 0 if failed == 0 else 1
 
 # --------------------------------------------------------------------------- CLI

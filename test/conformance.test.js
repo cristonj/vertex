@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
-import { loadCartridge, digest, toSVG, World } from '../src/index.js';
+import { loadCartridge, digest, toSVG, World, applyInput } from '../src/index.js';
 
 const suite = JSON.parse(readFileSync(new URL('../conformance/cases.json', import.meta.url), 'utf8'));
 
@@ -14,7 +14,7 @@ test('reference implementation reproduces every conformance digest', () => {
     const last = Math.max(...want.keys());
     let i = 0;
     for (let f = 0; f < last; f++) {
-      while (i < c.inputs.length && c.inputs[i][0] === f) { const [, k, a] = c.inputs[i++]; if (k === 'p') g.press(a); else g.release(a); }
+      while (i < c.inputs.length && c.inputs[i][0] === f) applyInput(g, c.inputs[i++]);
       g.step(1);
       if (want.has(g.world.frame)) { assert.equal(digest(g), want.get(g.world.frame), `${c.cartridge} seed ${c.seed} frame ${g.world.frame}`); n++; }
     }
@@ -27,7 +27,7 @@ const python = ['python3', 'python'].find((p) => spawnSync(p, ['--version']).sta
 test('second implementation (Python) is bit-identical on the conformance suite', { skip: !python && 'python not installed' }, () => {
   const r = spawnSync(python, ['py/vertex.py', 'conform'], { cwd: new URL('..', import.meta.url), encoding: 'utf8' });
   assert.equal(r.status, 0, r.stdout + r.stderr);
-  assert.match(r.stdout, / 0 failed/);
+  assert.match(r.stdout, /core\): \d+ passed, 0 failed/);
 });
 
 test('SVG gradient ids are valid and deterministic', () => {

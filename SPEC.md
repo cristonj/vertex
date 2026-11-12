@@ -1,6 +1,6 @@
 # The Vertex Format — Specification 1.0
 
-Status: **1.0**. The key words MUST, SHOULD and MAY are used as in RFC 2119.
+Status: **1.1** (additive over 1.0: physics, scenes, timers, text entities, pointer input). The key words MUST, SHOULD and MAY are used as in RFC 2119.
 
 Vertex is a format for games that are entirely text: vector art, scene, rules and input are JSON.
 This document defines the format precisely enough that independent implementations produce
@@ -20,10 +20,10 @@ checkpoints). An implementation is conformant at a level if it reproduces every 
 
 - **core** — everything needed to run cartridges headless and reproduce digests: the document
   model (§2), geometry (§3), world (§4), simulation (§5), rules (§6), systems `motion`, `wrap`,
-  `lifetime`, `collide` (§7), the canonical SVG frame and digest (§9), recordings (§10).
+  `lifetime`, `collide`, `physics` (§7), the canonical SVG frame and digest (§9), recordings (§10).
   Camera rotation is excluded.
-- **extended** — core plus `collideOutline`, `morph`, `keyframes`, camera rotation, sound
-  synthesis, rasterization and live renderers. Extended features are *implementation-tolerant*
+- **extended** — core plus `collideOutline`, `particles`, `follow`, `morph`, `keyframes`, camera
+  rotation, sound synthesis, rasterization and live renderers. Extended features are *implementation-tolerant*
   (§8): their results MAY differ in the last bits between implementations.
 
 Versioning: documents carry `"vertex": 1`. Additive changes (new optional fields, builtins,
@@ -45,14 +45,21 @@ A **scene** is a JSON object. All fields are optional.
 | `entities` | `Entity[]` | `[]` | Initial entities, in order |
 | `state` | object | `{}` | Game-level JSON values; `state.hud` is drawn as text |
 | `sounds` | `{name: Sound}` | `{}` | Synth parameters (extended) |
+| `physics` | `{gravity?: [gx, gy], iterations?, slop?}` | `[0, 900]`, 4, 0.01 | Settings for the `physics` system (§7.1) |
+| `scenes` | `{name: {entities, state?, camera?}}` | absent | Named levels/screens for `goto` (§5.1) |
+| `timers` | `[{at, type, ...}]` | `[]` | Pending timed events (§5.1); written by `after` |
 
 **Shape**: `{ d, fill?, stroke?, width?, clip? }` or `{ parts: Shape[] }`. `d` is SVG path data (§3).
 `fill` is a color string, `"none"`, or a gradient
 `{ type: "linear", x1, y1, x2, y2, stops }` / `{ type: "radial", cx, cy, r, stops }` with
 `stops: [[offset, color], ...]`, in shape-local coordinates. `clip` is path data the part is clipped to.
 
-**Entity**: `{ id?, shape?, d?, fill?, stroke?, width?, x, y, rot, scale, vx, vy, vr, drag?, layer?,
-parallax?, fixed?, hidden?, tags?, data? }`. `d` gives inline geometry instead of a named shape.
+**Entity**: `{ id?, shape?, d?, text?, size?, align?, fill?, stroke?, width?, x, y, rot, scale, vx, vy,
+vr, drag?, layer?, parallax?, fixed?, hidden?, body?, emitter?, tags?, data? }`. `d` gives inline
+geometry instead of a named shape. `text` gives inline geometry from the built-in stroke font
+(§9.2 HUD glyph rules, at `size` default 16, `align` default `"center"`: the line starts at
+`−width/2`, `−width` or 0 where `width = (n·6 − 2)·size/6` for n characters), painted with
+`fill="none"`, `stroke` default `#fff`, `width` default 1.5; an empty layout is `M0 0`.
 `rot` is radians (0 faces +x), `vx`/`vy` world units per second, `vr` radians per second.
 
 ### 2.2 Cartridge
@@ -96,6 +103,7 @@ left-to-right evaluation). `Z` appends the subpath's first point.
 ### 3.3 Bounds
 
 A shape's **radius** is `sqrt(max(x² + y²))` over all flattened points of all parts (0 if none).
+Its **box** is the min/max x and y over the same points (all zero if none).
 Its **pad** is `max(0, width/2)` over parts with a `stroke` other than `"none"` (`width` default 1).
 Inline geometry has radius from its own `d` and pad `(width ?? 1) / 2`.
 
@@ -112,10 +120,22 @@ Inline geometry has radius from its own `d` and pad `(width ?? 1) / 2`.
 ## 5. Simulation
 
 - Time advances in fixed steps of `dt = 1 / fps` (default fps 60).
-- **step**: (1) clear the event list; (2) run each system in order with `(game, dt)`; (3) `time += dt`,
-  `frame += 1`; (4) clear `pressed`.
+- **step**: (1) clear the event list; (2) fire due timers; (3) run each system in order with
+  `(game, dt)`; (4) apply a pending scene change; (5) `time += dt`, `frame += 1`; (6) clear `pressed`.
+
+### 5.1 Timers and scenes
+
+- `after(seconds, type, payload)` appends `{at: time + seconds, type, ...payload}` to `timers`.
+  At step (2), every timer with `at ≤ time + 1e-9` is removed and emitted as an event
+  `(type, {type, ...payload})`, in list order.
+- `goto(name)` requests a scene change (error if `scenes[name]` is absent); the last request in a
+  step wins. At step (4): despawn every entity, spawn the scene's entities in order, merge a copy of
+  the scene's `state` into `state`, replace `camera` if the scene has one, clear `timers`, set
+  `state.scene = name`, and emit `scene {name}`.
 - **Input** is named actions. `press(a)`: if `a` is not held, add it to `pressed`; add it to `held`.
   `release(a)`: remove it from `held`. Input is applied between steps.
+- **Pointer**: a world-space point `{x, y}` (initially 0, 0) set by `point(x, y)`; its button is
+  the ordinary action `"pointer"`.
 - **Events**: `emit(type, payload)` appends `{ type, frame, ...payload }` (frame = current frame,
   before increment). Events emitted in a step are visible to later systems in the same step.
 - **RNG**: xorshift32 over an unsigned 32-bit state `s` (initial `seed >>> 0`, 0 replaced by 1):
@@ -157,7 +177,10 @@ an array of program strings joined with `;`. `when` is a single expression.
 - Names resolve to locals (`let`), then bound variables. Assigning an undeclared name is an error.
 - Member access on a missing field yields undefined (falsy); `.length` works on arrays and strings.
   The fields `__proto__`, `prototype`, `constructor` are forbidden.
-- Variables: `dt`, `frame`, `time`, `state`, `W`, `H`, `PI`, and per rule `self`, `a`, `b`, `event`.
+- Variables: `dt`, `frame`, `time`, `state`, `W`, `H`, `PI`, `pointer` (`{x, y}`), `camera` (or
+  null), and per rule `self`, `a`, `b`, `event`.
+- Missing fields are **undefined**, distinct from null: `str` gives `"undefined"`, arithmetic gives
+  NaN, `==` distinguishes them. Arithmetic treats null as 0 and booleans as 0/1.
 
 ### 6.3 Rule kinds (evaluated in array order, once per step, when the rules system runs)
 
@@ -167,6 +190,7 @@ an array of program strings joined with `;`. `when` is a single expression.
 | `{ each: tag, do, when? }` | for each entity in `query(tag)` taken at rule start, skipping any despawned meanwhile; binds `self` |
 | `{ on: "start", do }` | in the step where `frame == 0` |
 | `{ on: "hit", tags?: [ta, tb], do }` | for each `hit` event so far this step (snapshot at rule start) whose `tags` equal `[ta, tb]`; binds `event`, `a`, `b`; skipped if either entity is gone |
+| `{ on: "contact", tags: [ta, tb], do }` | for each `contact` event so far this step whose entities have tags `ta` and `tb` in either order; binds `a` (the `ta` one), `b`, `event` |
 | `{ on: type, do }` | for each event of `type` so far this step; binds `event` |
 
 `when`, if present, is evaluated with the same bindings and skips `do` when falsy.
@@ -179,7 +203,10 @@ an array of program strings joined with `;`. `when` is a single expression.
 `emit(type, payload?)`, `sound(name)` (emits `{type:"sound", name}`), `dist(a, b)`,
 `abs`, `min`, `max`, `floor`, `ceil`, `round(v) = floor(v + 0.5)`, `sqrt`, `sign`,
 `clamp(v, lo, hi)`, `lerp(a, b, t) = a + (b − a)·t`, `str(v)` (ToString), `len(v)` (0 for null),
-and the implementation-tolerant `sin`, `cos`, `atan2`.
+`after(seconds, type, payload?)`, `goto(name)`, `nearest(x, y, tag)` (closest by squared
+distance, earliest on ties, or null), `burst(e, n)` (adds to `e.emitter.burst`),
+and the implementation-tolerant `sin`, `cos`, `atan2`, `at(x, y, tag?)` (topmost entity whose
+outline contains the point) and `raycast(x, y, dx, dy, max?, tag?)` (`{entity, x, y, distance}` or null).
 
 ## 7. Systems
 
@@ -190,9 +217,32 @@ and the implementation-tolerant `sin`, `cos`, `atan2`.
 | `lifetime` | for each entity (snapshot) with `data.ttl`: `ttl −= dt`; despawn if `ttl ≤ 0` |
 | `collide: [[ta, tb], ...]` | for each pair in order, for each `a` in `query(ta)`, each `b` in `query(tb)`, `a ≠ b`: emit `hit {a: a.id, b: b.id, tags: [ta, tb]}` if `(ax−bx)² + (ay−by)² < (ra + rb)²` |
 | `collideOutline` (extended) | as `collide`, then only if transformed outlines intersect or contain each other |
+| `physics` | §7.1 |
+| `particles` (extended) | emitters spawn particle entities (see `src/particles.js`) |
+| `follow: id \| {id, lerp}` (extended) | camera eases toward an entity: `k = 1 − (1 − lerp)^(60·dt)` (k = 1 when lerp ≥ 1) |
 | `rules` | §6 |
 
 Implementations MAY use any broadphase but MUST emit events in exactly this order.
+
+### 7.1 Physics
+
+Bodies are entities with a `body` object: `{static?, sensor?, collider?: "box"|"circle",
+restitution? = 0, friction? = 0, mass? = 1, gravity? = 1}`. Colliders are axis-aligned and
+ignore rotation: a box is the shape's local bounds (§3.3 box) × |scale| around (x, y); a circle has
+radius = local radius × |scale| centered at (x, y). One step:
+
+1. `bodies` = entities with `body`, in list order. For each: `ground = false`, `wall = 0`; if neither
+   static nor sensor, `vx += gx·gravity·dt`, `vy += gy·gravity·dt`.
+2. Unless fewer than 2 bodies, repeat up to `iterations` times: compute all colliders; for every
+   pair i < j (in lexicographic order) where not both are static/sensor, compute the contact
+   (`src/physics.js` `contact()`: AABB rejection with `≤`; circle–circle along centers;
+   circle–box via the closest point, or the shallowest axis when the center is inside; box–box
+   along the axis of least overlap, `ox < oy` choosing x). The first time a pair touches in this
+   step emit `contact {a, b, nx, ny}`. Sensors stop here. Otherwise: positional correction
+   `max(depth − slop, 0)/(ia + ib)` split by inverse mass (static = 0); set `ground`/`wall`
+   flags from the normal (`ny > 0.5` grounds a, `ny < −0.5` grounds b, `|nx| > 0.5` sets walls);
+   if approaching (`vn < 0`), apply the normal impulse with `max(restitution)` and Coulomb friction
+   with `sqrt(fa·fb)` clamped to `jn·μ`. Stop early when an iteration resolves no solid contact.
 
 ## 8. Numeric determinism
 
@@ -241,7 +291,7 @@ producing it byte-for-byte.
   STOPS = `<stop offset="O" stop-color="C"/>` for stops sorted by offset (stable);
   `<clipPath id="c-key"><path d="CLIP"/></clipPath>`. The gradient definition is generated when the
   fill is serialized, the clip right after.
-- **ENTITIES**: the draw list (§9.3). Inline geometry: `<path data-id="ID" d="ESC(d)" ATTRS(e, "e-ID") transform="T"/>`.
+- **ENTITIES**: the draw list (§9.3). Inline geometry (`d`, or `text` per §2.1): `<path data-id="ID" d="ESC(d)" ATTRS(e, "e-ID") transform="T"/>`.
   Shapes: `<use href="#SHAPE" data-id="ID" transform="T"/>`. Entities with neither emit nothing.
 - **T** without a camera: `translate(R2(x) R2(y)) rotate(R2(rot·180/π)) scale(R2(scale))`.
   With a camera: `matrix(a b c d e f)` with each value F4, of the full matrix (§9.4).
@@ -277,8 +327,10 @@ Result: `h1` then `h2` as 8 lowercase hex digits each.
 ## 10. Recordings
 
 ```json
-{ "vertex": 1, "scene": "path", "seed": 42, "fps": 60, "steps": 600, "digest": "…", "inputs": [[frame, "p"|"r", action], …] }
+{ "vertex": 1, "scene": "path", "seed": 42, "fps": 60, "steps": 600, "digest": "…", "inputs": [[frame, "p"|"r", action], [frame, "m", x, y], …] }
 ```
+
+`"m"` entries are pointer moves (§5).
 
 Replay: build the game with `seed` and `fps`; for `f = 0 … steps−1`, apply every input with
 frame `f` in order, then step. The final canonical frame's digest MUST equal `digest`.

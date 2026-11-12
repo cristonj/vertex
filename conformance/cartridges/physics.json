@@ -1,0 +1,48 @@
+{
+  "vertex": 1,
+  "title": "Conformance: physics, scenes, timers, text, pointer",
+  "description": "Core-level features only (no trig, no pow): boxes and circles, restitution, friction, sensors, contacts, timers, scene changes, text entities and pointer input.",
+  "width": 320, "height": 240, "background": "#000",
+  "physics": { "gravity": [0, 700], "iterations": 3 },
+  "shapes": {
+    "crate": { "d": "M-8 -8 H8 V8 H-8 Z", "fill": "#c96", "stroke": "#fff", "width": 1 },
+    "ball": { "d": "M-6 0 Q-6 -6 0 -6 Q6 -6 6 0 Q6 6 0 6 Q-6 6 -6 0 Z", "fill": "#6cf" },
+    "floor": { "d": "M-160 -6 H160 V6 H-160 Z", "fill": "#334" },
+    "wall": { "d": "M-6 -120 H6 V120 H-6 Z", "fill": "#334" },
+    "zone": { "d": "M-30 -30 H30 V30 H-30 Z", "stroke": "#0f0", "width": 1 }
+  },
+  "entities": [],
+  "state": { "drops": 0, "touches": 0, "label": "", "hud": "" },
+  "scenes": {
+    "a": {
+      "state": { "phase": "a" },
+      "entities": [
+        { "shape": "floor", "x": 160, "y": 234, "tags": ["solid"], "body": { "static": true } },
+        { "shape": "wall", "x": 6, "y": 120, "body": { "static": true } },
+        { "shape": "wall", "x": 314, "y": 120, "body": { "static": true } },
+        { "id": "zone", "shape": "zone", "x": 160, "y": 190, "tags": ["zone"], "body": { "sensor": true } },
+        { "id": "label", "text": "DROP ZONE", "size": 8, "x": 160, "y": 150, "stroke": "#0f0" }
+      ]
+    },
+    "b": {
+      "state": { "phase": "b" },
+      "entities": [
+        { "shape": "floor", "x": 160, "y": 234, "body": { "static": true, "friction": 0.8 } },
+        { "id": "label", "text": "PHASE B 2.5", "size": 12, "align": "left", "x": 20, "y": 60 }
+      ]
+    }
+  },
+  "keys": { "x": "drop", "c": "ball", "b": "pointer" },
+  "systems": ["motion", "physics", "lifetime", "rules"],
+  "rules": [
+    { "on": "start", "do": "goto('a'); after(12, 'switch')" },
+    { "on": "switch", "do": "goto('b')" },
+    { "when": "pressed('drop')", "do": "state.drops += 1; spawn('crate', {x: 40 + (state.drops * 37) % 240, y: 20, vx: rand(-80, 80), tags: ['thing'], body: {restitution: 0.3, friction: 0.5, mass: 2}})" },
+    { "when": "pressed('ball')", "do": "spawn('ball', {x: 160 + rand(-100, 100), y: 30, vy: 50, tags: ['thing'], body: {collider: 'circle', restitution: 0.8, friction: 0.1}})" },
+    { "when": "pressed('pointer')", "do": "let hit = nearest(pointer.x, pointer.y, 'thing'); if (hit) { hit.vy = -400; hit.vx = (pointer.x - hit.x) * 2 }" },
+    { "on": "contact", "tags": ["thing", "zone"], "do": "state.touches += 1; a.data.zoned = true" },
+    { "each": "thing", "when": "self.y > 400", "do": "despawn(self)" },
+    { "each": "thing", "when": "self.body.ground && frame % 60 == 0", "do": "self.data.ttl = 3" },
+    { "do": "state.hud = str(state.phase) + ' D' + str(state.drops) + ' T' + str(state.touches) + ' N' + str(count('thing')) + ' ' + str(floor(time * 10) / 10)" }
+  ]
+}
