@@ -165,7 +165,7 @@ npx vertex-engine new mygame</pre>
     button.addEventListener('click', async () => {
       button.disabled = true;
       try {
-        player = await createPlayer({ canvas, cartridge: doc, inspector: false, touch: false });
+        player = await createPlayer({ canvas, cartridge: doc, inspector: false, touch: false, fit: false });
         button.hidden = true;
         canvas.focus({ preventScroll: true });
       } catch (e) { button.textContent = 'Try again'; button.disabled = false; console.error(e); }
