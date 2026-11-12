@@ -159,7 +159,7 @@ if (auto) { const b = document.querySelector('[data-play="' + auto + '"]'); b?.c
 
 const files = [];
 (function walk(dir) {
-  for (const f of readdirSync(dir)) {
+  for (const f of readdirSync(dir).sort()) {
     const p = join(dir, f);
     if (statSync(p).isDirectory()) walk(p); else if (f.endsWith('.md')) files.push(p);
   }
