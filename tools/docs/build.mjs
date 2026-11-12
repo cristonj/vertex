@@ -174,7 +174,7 @@ for (const file of files) {
 for (const file of files) {
   const rel = relative(DOCS, file).replace(/\\/g, '/');
   const up = '../'.repeat(rel.split('/').length - 1);
-  const md = readFileSync(file, 'utf8');
+  const md = readFileSync(file, 'utf8').replace(/\r/g, ''); // CRLF checkouts must build identically
   embedCount = 0;
   const { html, toc, title } = render(md);
   const navHTML = NAV.map(([group, items]) => `<b>${group}</b>${items.map(([p, t]) => `<a href="${up}${p.replace(/\.md$/, '.html')}"${p === rel ? ' class="on"' : ''}>${t}</a>`).join('')}`).join('');
