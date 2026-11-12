@@ -19,7 +19,7 @@ one that emits them, so `"rules"` usually goes after `collide`/`physics`.
 | `"dialogue"` | runs conversations and draws the dialogue box | `dialogue`, `choice`, `dialogueEnd` |
 | `"motion3d"` | integrates `vz`, `vrx`, `vry`, `vrz` | |
 | `{ "chase": id \| {id, distance, height, lerp, pitch} }` | 3D camera behind an entity | |
-| `{ "collide3d": [[a, b], …] }` | bounding-sphere overlap in 3D | `hit` |
+| `{ "collide3d": [[a, b], …] }` | oriented mesh-bound boxes in 3D | `hit` |
 | `"morph"` · `"keyframes"` | path morphing (`data.morph`) · keyframed transforms (`data.keys`) | |
 
 Typical orders:

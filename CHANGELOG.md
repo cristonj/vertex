@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- Eleven-game arcade gallery with original SVG icons and measured source/gzip sizes, including Drift and Frontier.
+- New games: Apex (perspective highway racing), Breaker, Pulse, Serpent, Lunar and Rally.
+- Starfall: combos, shields, hearts, particles, outline collisions and restart. Ascent: clearer controls and summit restart.
+- Skyline: six-gem timed trial and restart; 3D collisions now use rotated mesh-bound boxes instead of oversized spheres.
+- Frontier: coin pickups now reach the rules system; corrected initial camera framing.
+- Gameplay and replay checks cover every cartridge. Original demo conformance fixtures are frozen so their published digests remain unchanged.
+
 ## 2.0.0
 
 The "real work" release: 3D, huge worlds, MMO networking, dialogue, and an npm package.

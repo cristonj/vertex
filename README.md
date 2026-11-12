@@ -59,13 +59,23 @@ npx vertex serve game.json --root .    # then open /?online (scaffolded projects
 
 ## Examples
 
-| Game | Shows | Size |
-|---|---|---|
-| [Starfall](examples/starfall/starfall.json) | rules-only arcade game | 2.3 KB |
-| [Ascent](examples/ascent/ascent.json) | platformer: physics, scenes, particles, timers, camera | 6 KB |
-| [Skyline](examples/skyline/skyline.json) | 3D: meshes, extrusion, fog, chase camera | 4 KB |
-| [Frontier](examples/frontier/frontier.json) | endless procedural multiplayer world, NPC dialogue, gold | 7 KB |
-| [Drift](examples/drift/drift.js) | the same engine from JavaScript, with recorded agent play | JS |
+<!-- GAMES:START -->
+| Game | Gameplay | Source | Gzip |
+|---|---|---:|---:|
+| [Apex](examples/apex/apex.json) | Perspective racing. Sunset bends, traffic, boost and timed checkpoints. | 8.5 KiB | 2.5 KiB |
+| [Drift](examples/drift/drift.js) | The original vector space shooter, with outline collisions and time rewind. | 3.2 KiB | 1.4 KiB |
+| [Breaker](examples/breaker/breaker.json) | Clear a neon wall. Paddle placement controls the bounce. Three lives. | 4.1 KiB | 1.5 KiB |
+| [Pulse](examples/pulse/pulse.json) | Formation shooting, return fire, shields and increasingly fast waves. | 4.7 KiB | 1.7 KiB |
+| [Serpent](examples/serpent/serpent.json) | Grow a luminous snake. Each fruit speeds up the grid. | 4.2 KiB | 1.5 KiB |
+| [Rally](examples/rally/rally.json) | A paddle duel against a beatable CPU. First to seven takes the match. | 4.3 KiB | 1.4 KiB |
+| [Lunar](examples/lunar/lunar.json) | A fuel-limited lander. Control angle and velocity for a soft touchdown. | 4.0 KiB | 1.4 KiB |
+| [Starfall](examples/starfall/starfall.json) | Catch gold, dodge red, chain combos and collect shields. | 7.1 KiB | 2.1 KiB |
+| [Ascent](examples/ascent/ascent.json) | Two platforming stages with variable jumps, gems and a summit. | 9.7 KiB | 2.0 KiB |
+| [Skyline](examples/skyline/skyline.json) | A 3D city time trial. Collect six gems and dodge the buildings. | 10.8 KiB | 1.9 KiB |
+| [Frontier](examples/frontier/frontier.json) | Explore an endless forest, gather gold and talk to wanderers. Solo or online. | 7.8 KiB | 2.5 KiB |
+
+Sizes measure each complete game source with LF line endings. Gzip uses level 9; the shared engine, player and optional icon are excluded. Rebuild with `node tools/gallery.mjs`.
+<!-- GAMES:END -->
 
 ## Use it headless (tests, agents, servers)
 

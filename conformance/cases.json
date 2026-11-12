@@ -1769,7 +1769,7 @@
    ]
   },
   {
-   "cartridge": "examples/starfall/starfall.json",
+   "cartridge": "conformance/cartridges/starfall-v1.json",
    "level": "core",
    "seed": 1,
    "fps": 60,
@@ -2243,7 +2243,7 @@
    ]
   },
   {
-   "cartridge": "examples/starfall/starfall.json",
+   "cartridge": "conformance/cartridges/starfall-v1.json",
    "level": "core",
    "seed": 42,
    "fps": 60,
@@ -2916,7 +2916,7 @@
    ]
   },
   {
-   "cartridge": "examples/starfall/starfall.json",
+   "cartridge": "conformance/cartridges/starfall-v1.json",
    "level": "core",
    "seed": 9001,
    "fps": 60,
@@ -8162,7 +8162,7 @@
    ]
   },
   {
-   "cartridge": "examples/ascent/ascent.json",
+   "cartridge": "conformance/cartridges/ascent-v1.json",
    "level": "extended",
    "seed": 1,
    "fps": 60,
@@ -8636,7 +8636,7 @@
    ]
   },
   {
-   "cartridge": "examples/ascent/ascent.json",
+   "cartridge": "conformance/cartridges/ascent-v1.json",
    "level": "extended",
    "seed": 42,
    "fps": 60,
@@ -9309,7 +9309,7 @@
    ]
   },
   {
-   "cartridge": "examples/ascent/ascent.json",
+   "cartridge": "conformance/cartridges/ascent-v1.json",
    "level": "extended",
    "seed": 9001,
    "fps": 60,

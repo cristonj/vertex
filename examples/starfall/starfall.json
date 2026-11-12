@@ -1,50 +1,271 @@
 {
   "vertex": 1,
   "title": "Starfall",
-  "description": "Catch falling stars, dodge the shards. A complete game in one JSON file: art, scene, rules, keys.",
-  "width": 480, "height": 360, "background": "#0d0b1a",
+  "description": "Catch falling stars, dodge the shards, build a combo. A complete arcade game in one JSON file.",
+  "width": 480,
+  "height": 360,
+  "background": "#0a0816",
   "shapes": {
-    "cup": { "parts": [
-      { "d": "M-26 -6 L-18 8 L18 8 L26 -6", "stroke": "#7df9ff", "width": 3 },
-      { "d": "M-14 8 L-10 12 L10 12 L14 8", "stroke": "#3aa6b9", "width": 2 }
-    ] },
-    "star": { "d": "M0 -10 L2.9 -4 L9.5 -3.1 L4.8 1.5 L5.9 8.1 L0 5 L-5.9 8.1 L-4.8 1.5 L-9.5 -3.1 L-2.9 -4 Z", "fill": "#ffd166" },
-    "shard": { "d": "M0 -12 L6 0 L0 12 L-6 0 Z", "fill": "none", "stroke": "#ff5d73", "width": 2 },
-    "spark": { "d": "M-2 0 L2 0 M0 -2 L0 2", "stroke": "#ffd166", "width": 1.5 }
+    "dot": {
+      "d": "M-1 0 A1 1 0 1 0 1 0 A1 1 0 1 0 -1 0 Z",
+      "fill": "#2b2650"
+    },
+    "cup": {
+      "parts": [
+        {
+          "d": "M-28 -4 L-20 10 L20 10 L28 -4",
+          "stroke": "#7df9ff",
+          "width": 4,
+          "fill": "none"
+        },
+        {
+          "d": "M-14 10 L-10 15 L10 15 L14 10",
+          "stroke": "#3aa6b9",
+          "width": 2.5,
+          "fill": "none"
+        },
+        {
+          "d": "M-20 -4 L20 -4",
+          "stroke": "#b9fdff",
+          "width": 2,
+          "fill": "none"
+        }
+      ]
+    },
+    "star": {
+      "d": "M0 -12 L3.5 -4.8 L11.4 -3.7 L5.8 1.8 L7.1 9.7 L0 6 L-7.1 9.7 L-5.8 1.8 L-11.4 -3.7 L-3.5 -4.8 Z",
+      "fill": "#ffd166",
+      "stroke": "#8a5b00",
+      "width": 1
+    },
+    "shard": {
+      "parts": [
+        {
+          "d": "M0 -13 L7 0 L0 13 L-7 0 Z",
+          "fill": "#2a1020",
+          "stroke": "#ff5d73",
+          "width": 2.5
+        },
+        {
+          "d": "M0 -8 L3.5 0 L0 8 L-3.5 0 Z",
+          "fill": "#ff5d73"
+        }
+      ]
+    },
+    "heart": {
+      "d": "M0 6 C-12 -2 -8 -12 0 -6 C8 -12 12 -2 0 6 Z",
+      "fill": "#ff7b9c",
+      "stroke": "#8a2040",
+      "width": 1.5
+    },
+    "shield": {
+      "d": "M0 -10 L9 -5 L7 6 L0 11 L-7 6 L-9 -5 Z",
+      "fill": "none",
+      "stroke": "#7df9ff",
+      "width": 2.5
+    },
+    "spark": {
+      "d": "M-2.5 0 H2.5 M0 -2.5 V2.5",
+      "stroke": "#ffd166",
+      "width": 1.5
+    }
   },
-  "entities": [
-    { "id": "player", "shape": "cup", "x": 240, "y": 330, "tags": ["player"] }
-  ],
   "sounds": {
-    "ding": { "wave": "triangle", "freq": 880, "slide": 900, "decay": 0.15, "volume": 0.3 },
-    "crack": { "wave": "noise", "freq": 1500, "slide": -1200, "decay": 0.3, "volume": 0.4 }
+    "ding": {
+      "wave": "triangle",
+      "freq": 880,
+      "slide": 1320,
+      "decay": 0.16,
+      "volume": 0.28
+    },
+    "crack": {
+      "wave": "noise",
+      "freq": 1600,
+      "slide": -1300,
+      "decay": 0.35,
+      "volume": 0.42
+    },
+    "shield": {
+      "wave": "sine",
+      "freq": 520,
+      "slide": 1040,
+      "decay": 0.3,
+      "volume": 0.3
+    },
+    "over": {
+      "wave": "saw",
+      "freq": 300,
+      "slide": -160,
+      "decay": 0.8,
+      "volume": 0.3
+    }
   },
-  "state": { "score": 0, "lives": 3, "speed": 90, "spawnEvery": 40, "timer": 0, "over": false, "hud": "" },
-  "keys": { "ArrowLeft": "left", "ArrowRight": "right", "a": "left", "d": "right" },
-  "systems": ["motion", "lifetime", { "collide": [["player", "star"], ["player", "shard"]] }, "rules"],
+  "state": {
+    "score": 0,
+    "best": 0,
+    "lives": 3,
+    "combo": 1,
+    "comboT": 0,
+    "speed": 95,
+    "st": 0,
+    "over": false,
+    "shield": 0,
+    "hud": ""
+  },
+  "keys": {
+    "ArrowLeft": "left",
+    "ArrowRight": "right",
+    "a": "left",
+    "d": "right",
+    "Enter": "start"
+  },
+  "systems": [
+    "motion",
+    "wrap",
+    "particles",
+    "lifetime",
+    {
+      "collideOutline": [
+        [
+          "player",
+          "star"
+        ],
+        [
+          "player",
+          "shard"
+        ],
+        [
+          "player",
+          "heart"
+        ],
+        [
+          "player",
+          "shield"
+        ]
+      ]
+    },
+    "rules"
+  ],
+  "scenes": {
+    "play": {
+      "state": {
+        "score": 0,
+        "lives": 3,
+        "combo": 1,
+        "comboT": 0,
+        "speed": 95,
+        "st": 0,
+        "over": false,
+        "shield": 0,
+        "elapsed": 0
+      },
+      "entities": [
+        {
+          "id": "player",
+          "shape": "cup",
+          "x": 240,
+          "y": 330,
+          "tags": [
+            "player"
+          ]
+        }
+      ]
+    }
+  },
   "rules": [
-    { "each": "player", "when": "!state.over && held('left')", "do": "self.x = max(26, self.x - 260 * dt)" },
-    { "each": "player", "when": "!state.over && held('right')", "do": "self.x = min(W - 26, self.x + 260 * dt)" },
-
-    { "when": "!state.over", "do": [
-      "state.timer += 1",
-      "if (state.timer >= state.spawnEvery) { state.timer = 0; let kind = random() < 0.7 ? 'star' : 'shard'; spawn(kind, {x: rand(20, W - 20), y: -12, vy: state.speed * rand(0.8, 1.3), vr: rand(-2, 2), tags: [kind, 'falling']}) }",
-      "state.speed += 2 * dt",
-      "state.spawnEvery = max(12, 40 - floor(state.score / 5))"
-    ] },
-
-    { "each": "falling", "when": "self.y > H + 20", "do": "despawn(self)" },
-
-    { "on": "hit", "tags": ["player", "star"], "do": [
-      "despawn(b); state.score += 1; sound('ding')",
-      "spawn('spark', {x: b.x, y: b.y, vx: -40, vy: -60, data: {ttl: 0.3}})",
-      "spawn('spark', {x: b.x, y: b.y, vx: 40, vy: -60, data: {ttl: 0.3}})"
-    ] },
-    { "on": "hit", "tags": ["player", "shard"], "do": [
-      "despawn(b); state.lives -= 1; sound('crack')",
-      "if (state.lives <= 0) { state.over = true; emit('gameover', {score: state.score}) }"
-    ] },
-
-    { "do": "state.hud = state.over ? 'GAME OVER  SCORE ' + str(state.score) : 'SCORE ' + str(state.score) + '  LIVES ' + str(state.lives)" }
+    {
+      "on": "start",
+      "do": "goto('play')"
+    },
+    {
+      "on": "scene",
+      "when": "event.name == 'play'",
+      "do": "repeat (26) spawn('dot', {x: rand(8,W-8), y: rand(4,H-4), vy: rand(12,32), layer: -1, tags: ['bg','wrap']}); spawn(null, {text: 'CATCH GOLD   DODGE RED', size: 11, x: W / 2, y: 190, layer: -1, stroke: '#4b4070', width: 1.4})"
+    },
+    {
+      "each": "player",
+      "when": "!state.over",
+      "do": [
+        "if (held('left')) self.x = max(30, self.x - 330 * dt)",
+        "if (held('right')) self.x = min(W - 30, self.x + 330 * dt)",
+        "self.rot = self.rot + (((held('right') ? 1 : 0) - (held('left') ? 1 : 0)) * 0.12 - self.rot) * min(1, 15 * dt)"
+      ]
+    },
+    {
+      "when": "!state.over",
+      "do": [
+        "state.elapsed += dt",
+        "state.st -= dt",
+        "state.comboT = max(0, state.comboT - dt)",
+        "if (state.comboT <= 0 && state.combo > 1) state.combo = 1",
+        "if (state.shield > 0) state.shield -= dt",
+        "if (state.st <= 0) { let kind = random() < max(0.16, 0.7 - state.score / 400) ? 'star' : 'shard'; spawn(kind, {x: rand(24, W - 24), y: -16, vy: state.speed * rand(0.85, 1.25), vr: rand(-3, 3), tags: [kind, 'falling']}); state.st = max(0.3, 1.15 - state.score / 260) * rand(0.7, 1.2) }",
+        "if (random() < 0.0008) spawn('heart', {x: rand(30, W - 30), y: -16, vy: state.speed, tags: ['heart', 'falling'], vr: 1.5})",
+        "if (random() < 0.0012) spawn('shield', {x: rand(30, W - 30), y: -16, vy: state.speed, tags: ['shield', 'falling'], vr: -1.5})",
+        "state.speed += 2.2 * dt"
+      ]
+    },
+    {
+      "each": "falling",
+      "when": "self.y > H + 24",
+      "do": "despawn(self)"
+    },
+    {
+      "each": "bg",
+      "do": "self.vy = 12 + self.scale * 22"
+    },
+    {
+      "on": "hit",
+      "tags": [
+        "player",
+        "star"
+      ],
+      "when": "!state.over",
+      "do": [
+        "despawn(b); state.combo = min(9, state.combo + 1); state.comboT = 2.2; state.score += 10 * state.combo; sound('ding')",
+        "spawn('spark', {x: b.x, y: b.y, vx: -60, vy: -40, data: {ttl: 0.3}})",
+        "spawn('spark', {x: b.x, y: b.y, vx: 60, vy: -40, data: {ttl: 0.3}})",
+        "spawn(null, {text: '+' + str(10 * state.combo), size: 10, x: b.x, y: b.y - 8, stroke: '#ffd166', width: 1.5, vy: -40, data: {ttl: 0.7}})"
+      ]
+    },
+    {
+      "on": "hit",
+      "tags": [
+        "player",
+        "shard"
+      ],
+      "when": "!state.over",
+      "do": [
+        "despawn(b); state.combo = 1; state.comboT = 0",
+        "if (state.shield > 0) { state.shield = 0; sound('shield') } else { state.lives -= 1; sound('crack'); spawn(null, {x: b.x, y: b.y, emitter: {shape: 'spark', burst: 10, rate: 0, life: [0.2, 0.5], speed: [80, 200], stroke: '#ff5d73'}, data: {ttl: 0.7}}) }",
+        "if (state.lives <= 0) { state.over = true; state.best = max(state.best, state.score); sound('over'); spawn(null, {text: 'GAME OVER', size: 34, x: W / 2, y: 150, stroke: '#ff5d73', width: 3}); spawn(null, {text: 'SCORE ' + str(state.score) + '   PRESS ENTER', size: 11, x: W / 2, y: 190, stroke: '#f2f4f8', width: 1.5}); emit('gameover', {score: state.score}) }"
+      ]
+    },
+    {
+      "on": "hit",
+      "tags": [
+        "player",
+        "heart"
+      ],
+      "when": "!state.over",
+      "do": "despawn(b); state.lives = min(5, state.lives + 1); sound('shield')"
+    },
+    {
+      "on": "hit",
+      "tags": [
+        "player",
+        "shield"
+      ],
+      "when": "!state.over",
+      "do": "despawn(b); state.shield = 7; sound('shield')"
+    },
+    {
+      "each": "player",
+      "when": "state.over && pressed('start')",
+      "do": "goto('play')"
+    },
+    {
+      "do": "state.hud = 'SCORE ' + str(state.score) + '  LIVES ' + str(state.lives) + (state.combo > 1 ? '  X' + str(state.combo) : '') + (state.shield > 0 ? '  SHIELD' : '') + '  BEST ' + str(max(state.best, state.score))"
+    }
   ]
 }

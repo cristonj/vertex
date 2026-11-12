@@ -1,0 +1,167 @@
+{
+  "vertex": 1,
+  "title": "Rally",
+  "description": "First to seven wins this paddle duel. Up/down or W/S moves. Space serves. Hit near the paddle edge to change the angle.",
+  "width": 480,
+  "height": 360,
+  "background": "#0b0e1a",
+  "shapes": {
+    "paddle": {
+      "d": "M-5 -33h10v66h-10Z",
+      "fill": "#7df9ff"
+    },
+    "ball": {
+      "d": "M-4.5 -4.5h9v9h-9Z",
+      "fill": "#ffcf5a"
+    }
+  },
+  "sounds": {
+    "hit": {
+      "wave": "triangle",
+      "freq": 660,
+      "slide": 900,
+      "decay": 0.12,
+      "volume": 0.2
+    },
+    "lose": {
+      "wave": "saw",
+      "freq": 180,
+      "slide": -120,
+      "decay": 0.4,
+      "volume": 0.2
+    }
+  },
+  "state": {
+    "score": 0,
+    "over": false,
+    "hud": "",
+    "you": 0,
+    "cpu": 0,
+    "serve": 1
+  },
+  "keys": {
+    "ArrowLeft": "left",
+    "ArrowRight": "right",
+    "a": "left",
+    "d": "right",
+    " ": "fire",
+    "Enter": "start",
+    "ArrowUp": "up",
+    "ArrowDown": "down",
+    "w": "up",
+    "s": "down"
+  },
+  "systems": [
+    "motion",
+    "rules"
+  ],
+  "scenes": {
+    "play": {
+      "state": {
+        "score": 0,
+        "over": false,
+        "hud": "",
+        "you": 0,
+        "cpu": 0,
+        "serve": 1
+      },
+      "entities": [
+        {
+          "id": "player",
+          "shape": "paddle",
+          "x": 24,
+          "y": 180,
+          "tags": [
+            "paddle"
+          ]
+        },
+        {
+          "id": "cpu",
+          "shape": "paddle",
+          "x": 456,
+          "y": 180,
+          "tags": [
+            "cpu"
+          ]
+        },
+        {
+          "id": "ball",
+          "shape": "ball",
+          "x": 240,
+          "y": 180,
+          "tags": [
+            "ball"
+          ],
+          "data": {
+            "ready": true
+          }
+        },
+        {
+          "id": "score",
+          "text": "0 : 0",
+          "x": 240,
+          "y": 65,
+          "size": 28,
+          "stroke": "#7df9ff",
+          "width": 1.5
+        },
+        {
+          "id": "info",
+          "text": "UP/DOWN MOVE   SPACE SERVES",
+          "x": 240,
+          "y": 350,
+          "size": 12,
+          "stroke": "#7df9ff",
+          "width": 1.5
+        },
+        {
+          "d": "M240 80V320",
+          "x": 0,
+          "y": 0,
+          "stroke": "#263652",
+          "width": 2
+        }
+      ]
+    }
+  },
+  "rules": [
+    {
+      "on": "start",
+      "do": "goto('play')"
+    },
+    {
+      "on": "scene",
+      "when": "event.name == 'play'",
+      "do": ""
+    },
+    {
+      "each": "paddle",
+      "when": "!state.over",
+      "do": "self.y = clamp(self.y + ((held('down') ? 1 : 0) - (held('up') ? 1 : 0)) * 300 * dt, 62, 316)"
+    },
+    {
+      "each": "cpu",
+      "when": "!state.over",
+      "do": "let b = get('ball'); self.y += clamp(b.y - self.y, -185 * dt, 185 * dt); self.y = clamp(self.y, 62, 316)"
+    },
+    {
+      "each": "ball",
+      "when": "!state.over",
+      "do": [
+        "if (self.data.ready && pressed('fire')) { self.data.ready = false; self.vx = 230 * state.serve; self.vy = rand(-110,110) }",
+        "if (self.y < 32) { self.y = 32; self.vy = abs(self.vy) }; if (self.y > 342) { self.y = 342; self.vy = -abs(self.vy) }",
+        "let p = get('player'); let c = get('cpu'); if (self.vx < 0 && self.x <= 34 && self.x >= 18 && abs(self.y - p.y) < 38) { self.x = 35; self.vx = min(430, abs(self.vx) + 18); self.vy = (self.y - p.y) * 6; sound('hit') }; if (self.vx > 0 && self.x >= 446 && self.x <= 462 && abs(self.y - c.y) < 38) { self.x = 445; self.vx = -min(430, abs(self.vx) + 18); self.vy = (self.y - c.y) * 6; sound('hit') }",
+        "if (self.x < -10 || self.x > W + 10) { if (self.x < 0) { state.cpu += 1; state.serve = -1 } else { state.you += 1; state.serve = 1 }; self.x = 240; self.y = 180; self.vx = 0; self.vy = 0; self.data.ready = true; state.score = state.you; sound('lose'); if (state.you >= 7 || state.cpu >= 7) { state.over = true; spawn(null, {text: state.you >= 7 ? 'YOU WIN' : 'CPU WINS', size: 28, x: 240, y: 180, stroke: '#ffcf5a', width: 2}) } }"
+      ]
+    },
+    {
+      "do": "let s = get('score'); if (s) s.text = str(state.you) + ' : ' + str(state.cpu)"
+    },
+    {
+      "do": "if (state.over && pressed('start')) goto('play')"
+    },
+    {
+      "do": "state.hud = 'SCORE ' + str(state.score) + (state.over ? '   ENTER TO RESTART' : '')"
+    }
+  ]
+}

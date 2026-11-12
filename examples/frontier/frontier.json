@@ -2,82 +2,285 @@
   "vertex": 1,
   "title": "Frontier",
   "description": "An endless procedural world for many players: chunk streaming, generated forests and camps, NPCs with branching dialogue, gold and per-player state. Plays solo, or as an MMO with `vertex serve`.",
-  "width": 480, "height": 320, "background": "#1d2b22",
-  "camera": { "x": 0, "y": 0 },
-  "physics": { "gravity": [0, 0], "iterations": 2 },
-  "streaming": { "chunk": 320, "radius": 1, "focus": "player" },
-  "interaction": { "focus": "player" },
+  "width": 480,
+  "height": 320,
+  "background": "#1d2b22",
+  "camera": {
+    "x": 160,
+    "y": 160
+  },
+  "physics": {
+    "gravity": [
+      0,
+      0
+    ],
+    "iterations": 2
+  },
+  "streaming": {
+    "chunk": 320,
+    "radius": 1,
+    "focus": "player"
+  },
+  "interaction": {
+    "focus": "player"
+  },
   "multiplayer": {
-    "player": { "shape": "hero", "tags": ["player"], "body": { "collider": "circle" }, "data": { "gold": 0, "met": 0 } },
-    "spawn": { "x": 160, "y": 160, "spread": 60 },
-    "interest": 480, "publicData": ["name"], "sendRate": 20
+    "player": {
+      "shape": "hero",
+      "tags": [
+        "player"
+      ],
+      "body": {
+        "collider": "circle"
+      },
+      "data": {
+        "gold": 0,
+        "met": 0
+      }
+    },
+    "spawn": {
+      "x": 160,
+      "y": 160,
+      "spread": 60
+    },
+    "interest": 480,
+    "publicData": [
+      "name"
+    ],
+    "sendRate": 20
   },
   "shapes": {
-    "hero": { "parts": [
-      { "d": "M-7 0 Q-7 -7 0 -7 Q7 -7 7 0 Q7 7 0 7 Q-7 7 -7 0 Z", "fill": "#ffcf5a", "stroke": "#5a3d00", "width": 1.5 },
-      { "d": "M2 -3 H5 V0 H2 Z", "fill": "#1d2b22" }
-    ] },
-    "tree": { "parts": [
-      { "d": "M0 -16 L13 8 L-13 8 Z", "fill": "#2f6b3a", "stroke": "#1a3d21", "width": 1.5 },
-      { "d": "M0 -6 L10 14 L-10 14 Z", "fill": "#3b8247" }
-    ] },
-    "rock": { "d": "M-10 4 Q-11 -6 -2 -8 Q9 -9 11 1 Q10 8 0 8 Q-8 9 -10 4 Z", "fill": "#6f7782", "stroke": "#3e444c", "width": 1.5 },
-    "coin": { "d": "M-4 0 Q-4 -4 0 -4 Q4 -4 4 0 Q4 4 0 4 Q-4 4 -4 0 Z", "fill": "#ffd166", "stroke": "#a87b00", "width": 1 },
-    "fire": { "parts": [
-      { "d": "M-6 6 L6 6 L0 -10 Z", "fill": "#ff7b3a" },
-      { "d": "M-3 6 L3 6 L0 -3 Z", "fill": "#ffd166" }
-    ] },
-    "npc": { "parts": [
-      { "d": "M-7 0 Q-7 -7 0 -7 Q7 -7 7 0 Q7 7 0 7 Q-7 7 -7 0 Z", "fill": "#8fb8ff", "stroke": "#1f3a66", "width": 1.5 },
-      { "d": "M-3 -2 H-1 V0 H-3 Z M1 -2 H3 V0 H1 Z", "fill": "#1f3a66" }
-    ] },
-    "spark": { "d": "M-1.5 0 L1.5 0", "stroke": "#ffd166", "width": 2 }
+    "hero": {
+      "parts": [
+        {
+          "d": "M-7 0 Q-7 -7 0 -7 Q7 -7 7 0 Q7 7 0 7 Q-7 7 -7 0 Z",
+          "fill": "#ffcf5a",
+          "stroke": "#5a3d00",
+          "width": 1.5
+        },
+        {
+          "d": "M2 -3 H5 V0 H2 Z",
+          "fill": "#1d2b22"
+        }
+      ]
+    },
+    "tree": {
+      "parts": [
+        {
+          "d": "M0 -16 L13 8 L-13 8 Z",
+          "fill": "#2f6b3a",
+          "stroke": "#1a3d21",
+          "width": 1.5
+        },
+        {
+          "d": "M0 -6 L10 14 L-10 14 Z",
+          "fill": "#3b8247"
+        }
+      ]
+    },
+    "rock": {
+      "d": "M-10 4 Q-11 -6 -2 -8 Q9 -9 11 1 Q10 8 0 8 Q-8 9 -10 4 Z",
+      "fill": "#6f7782",
+      "stroke": "#3e444c",
+      "width": 1.5
+    },
+    "coin": {
+      "d": "M-4 0 Q-4 -4 0 -4 Q4 -4 4 0 Q4 4 0 4 Q-4 4 -4 0 Z",
+      "fill": "#ffd166",
+      "stroke": "#a87b00",
+      "width": 1
+    },
+    "fire": {
+      "parts": [
+        {
+          "d": "M-6 6 L6 6 L0 -10 Z",
+          "fill": "#ff7b3a"
+        },
+        {
+          "d": "M-3 6 L3 6 L0 -3 Z",
+          "fill": "#ffd166"
+        }
+      ]
+    },
+    "npc": {
+      "parts": [
+        {
+          "d": "M-7 0 Q-7 -7 0 -7 Q7 -7 7 0 Q7 7 0 7 Q-7 7 -7 0 Z",
+          "fill": "#8fb8ff",
+          "stroke": "#1f3a66",
+          "width": 1.5
+        },
+        {
+          "d": "M-3 -2 H-1 V0 H-3 Z M1 -2 H3 V0 H1 Z",
+          "fill": "#1f3a66"
+        }
+      ]
+    },
+    "spark": {
+      "d": "M-1.5 0 L1.5 0",
+      "stroke": "#ffd166",
+      "width": 2
+    }
   },
   "entities": [
-    { "id": "solo", "shape": "hero", "x": 160, "y": 160, "tags": ["player", "solo"], "body": { "collider": "circle" }, "data": { "gold": 0, "met": 0 } }
+    {
+      "id": "solo",
+      "shape": "hero",
+      "x": 160,
+      "y": 160,
+      "tags": [
+        "player",
+        "solo"
+      ],
+      "body": {
+        "collider": "circle"
+      },
+      "data": {
+        "gold": 0,
+        "met": 0
+      }
+    },
+    {
+      "id": "welcome",
+      "text": "EXPLORE   COLLECT GOLD   E TO TALK",
+      "size": 9,
+      "x": 160,
+      "y": 116,
+      "stroke": "#b5d3ad",
+      "width": 1
+    }
   ],
   "dialogue": {
-    "wanderer": { "start": "hello", "nodes": {
-      "hello": { "speaker": "{npc.data.name}", "text": "Well met, traveller. The frontier goes on forever, they say. You carry {actor ? actor.data.gold : 0} gold.",
-        "do": "if (actor) actor.data.met += 1",
-        "choices": [
-          { "text": "What is out there?", "goto": "lore" },
-          { "text": "Buy a lantern (5 gold)", "when": "actor && actor.data.gold >= 5 && !actor.data.lantern", "do": "actor.data.gold -= 5; actor.data.lantern = true", "goto": "bought" },
-          { "text": "I found treasure for you.", "when": "actor && actor.data.gold >= 20", "goto": "rich" },
-          { "text": "Farewell.", "goto": null }
-        ] },
-      "lore": { "speaker": "{npc.data.name}", "text": "Forests, stones, and camps like this one, each lit by a fire. Every camp keeps a story. Collect gold and come back.", "next": "hello" },
-      "bought": { "speaker": "{npc.data.name}", "text": "A fine lantern. May it keep the dark away.", "next": null },
-      "rich": { "speaker": "{npc.data.name}", "text": "Twenty gold! You are the richest soul on the frontier. Keep it; tales are worth more to me.", "do": "actor.data.title = 'the Rich'", "next": null }
-    } }
+    "wanderer": {
+      "start": "hello",
+      "nodes": {
+        "hello": {
+          "speaker": "{npc.data.name}",
+          "text": "Well met, traveller. The frontier goes on forever, they say. You carry {actor ? actor.data.gold : 0} gold.",
+          "do": "if (actor) actor.data.met += 1",
+          "choices": [
+            {
+              "text": "What is out there?",
+              "goto": "lore"
+            },
+            {
+              "text": "Buy a lantern (5 gold)",
+              "when": "actor && actor.data.gold >= 5 && !actor.data.lantern",
+              "do": "actor.data.gold -= 5; actor.data.lantern = true",
+              "goto": "bought"
+            },
+            {
+              "text": "I found treasure for you.",
+              "when": "actor && actor.data.gold >= 20",
+              "goto": "rich"
+            },
+            {
+              "text": "Farewell.",
+              "goto": null
+            }
+          ]
+        },
+        "lore": {
+          "speaker": "{npc.data.name}",
+          "text": "Forests, stones, and camps like this one, each lit by a fire. Every camp keeps a story. Collect gold and come back.",
+          "next": "hello"
+        },
+        "bought": {
+          "speaker": "{npc.data.name}",
+          "text": "A fine lantern. May it keep the dark away.",
+          "next": null
+        },
+        "rich": {
+          "speaker": "{npc.data.name}",
+          "text": "Twenty gold! You are the richest soul on the frontier. Keep it; tales are worth more to me.",
+          "do": "actor.data.title = 'the Rich'",
+          "next": null
+        }
+      }
+    }
   },
-  "keys": { "ArrowLeft": "left", "ArrowRight": "right", "ArrowUp": "up", "ArrowDown": "down", "a": "left", "d": "right", "w": "up", "s": "down", "e": "interact", "Enter": "confirm", " ": "confirm" },
-  "systems": ["streaming", "rules", "motion", "physics", "particles", "lifetime", "interact", "dialogue", { "follow": "solo" }],
-  "rules": [
-    { "on": "join", "do": "despawn('solo')" },
-
-    { "on": "chunkEnter", "when": "event.fresh", "do": [
-      "let cx = event.cx; let cy = event.cy; let s = event.size",
-      "repeat (5 + floor(hash(cx, cy, 1) * 9)) { let px = event.x + hash(cx, cy, 10 + i) * s; let py = event.y + hash(cx, cy, 40 + i) * s; if (noise(px / 180, py / 180, 3) > 0.42 && abs(px - 160) + abs(py - 160) > 90) spawn('tree', {x: px, y: py, tags: ['solid'], body: {static: true, collider: 'circle'}, scale: 0.8 + hash(cx, cy, 70 + i) * 0.6}) }",
-      "repeat (floor(hash(cx, cy, 2) * 3)) { let rx = event.x + hash(cx, cy, 100 + i) * s; let ry = event.y + hash(cx, cy, 130 + i) * s; if (abs(rx - 160) + abs(ry - 160) > 90) spawn('rock', {x: rx, y: ry, tags: ['solid'], body: {static: true}}) }",
-      "repeat (2 + floor(hash(cx, cy, 3) * 4)) spawn('coin', {x: event.x + hash(cx, cy, 200 + i) * s, y: event.y + hash(cx, cy, 230 + i) * s, tags: ['coin'], body: {sensor: true}, vr: 2})",
-      "if (hash(cx, cy, 4) < 0.35 || (cx == 0 && cy == 0)) { let fx = event.x + s / 2 + 40; let fy = event.y + s / 2; spawn('fire', {x: fx, y: fy, emitter: {shape: 'spark', rate: 8, life: [0.4, 0.9], speed: [10, 30], angle: [-2.4, -0.7]}}); spawn('npc', {x: fx - 26, y: fy, tags: ['npc', 'solid'], body: {static: true, collider: 'circle'}, interact: {prompt: 'Talk', dialogue: 'wanderer', radius: 40}, data: {name: hash(cx, cy, 5) < 0.5 ? 'Ilka' : 'Osric'}}) }"
-    ] },
-
-    { "each": "player", "when": "!self.data.dialogue && !state.dialogue", "do": [
-      "let mx = axis('x') + (held('right') ? 1 : 0) - (held('left') ? 1 : 0)",
-      "let my = axis('y') + (held('down') ? 1 : 0) - (held('up') ? 1 : 0)",
-      "let l = sqrt(mx * mx + my * my); if (l > 1) { mx = mx / l; my = my / l }",
-      "self.vx = self.vx + (mx * 140 - self.vx) * min(1, 10 * dt)",
-      "self.vy = self.vy + (my * 140 - self.vy) * min(1, 10 * dt)",
-      "if (l > 0.1) self.rot = atan2(my, mx)"
-    ] },
-    { "each": "player", "when": "self.data.dialogue || state.dialogue", "do": "self.vx = 0; self.vy = 0" },
-
-    { "on": "contact", "tags": ["player", "coin"], "do": "despawn(b); a.data.gold += 1; sound('coin'); spawn(null, {x: b.x, y: b.y, emitter: {shape: 'spark', burst: 8, rate: 0, life: [0.2, 0.4], speed: [30, 80]}, data: {ttl: 0.5}})" },
-
-    { "each": "player", "do": "self.data.hud = (self.data.title ? self.data.name + ' ' + self.data.title + '  ' : '') + 'GOLD ' + str(self.data.gold) + (self.data.lantern ? '  LANTERN' : '') + '  ' + str(floor(self.x / 32)) + ',' + str(floor(self.y / 32))" },
-    { "do": "let p = first('player'); state.hud = p ? p.data.hud : ''" }
+  "keys": {
+    "ArrowLeft": "left",
+    "ArrowRight": "right",
+    "ArrowUp": "up",
+    "ArrowDown": "down",
+    "a": "left",
+    "d": "right",
+    "w": "up",
+    "s": "down",
+    "e": "interact",
+    "Enter": "confirm",
+    " ": "confirm"
+  },
+  "systems": [
+    "streaming",
+    "motion",
+    "physics",
+    "particles",
+    "lifetime",
+    "rules",
+    "interact",
+    "dialogue",
+    {
+      "follow": "solo"
+    }
   ],
-  "sounds": { "coin": { "wave": "triangle", "freq": 880, "slide": 600, "decay": 0.12, "volume": 0.25 } }
+  "rules": [
+    {
+      "on": "join",
+      "do": "despawn('solo')"
+    },
+    {
+      "on": "chunkEnter",
+      "when": "event.fresh",
+      "do": [
+        "let cx = event.cx; let cy = event.cy; let s = event.size",
+        "repeat (5 + floor(hash(cx, cy, 1) * 9)) { let px = event.x + hash(cx, cy, 10 + i) * s; let py = event.y + hash(cx, cy, 40 + i) * s; if (noise(px / 180, py / 180, 3) > 0.42 && abs(px - 160) + abs(py - 160) > 90) spawn('tree', {x: px, y: py, tags: ['solid'], body: {static: true, collider: 'circle'}, scale: 0.8 + hash(cx, cy, 70 + i) * 0.6}) }",
+        "repeat (floor(hash(cx, cy, 2) * 3)) { let rx = event.x + hash(cx, cy, 100 + i) * s; let ry = event.y + hash(cx, cy, 130 + i) * s; if (abs(rx - 160) + abs(ry - 160) > 90) spawn('rock', {x: rx, y: ry, tags: ['solid'], body: {static: true}}) }",
+        "repeat (2 + floor(hash(cx, cy, 3) * 4)) spawn('coin', {x: event.x + hash(cx, cy, 200 + i) * s, y: event.y + hash(cx, cy, 230 + i) * s, tags: ['coin'], body: {sensor: true}, vr: 2})",
+        "if (hash(cx, cy, 4) < 0.35 || (cx == 0 && cy == 0)) { let fx = event.x + s / 2 + 40; let fy = event.y + s / 2; spawn('fire', {x: fx, y: fy, emitter: {shape: 'spark', rate: 8, life: [0.4, 0.9], speed: [10, 30], angle: [-2.4, -0.7]}}); spawn('npc', {x: fx - 26, y: fy, tags: ['npc', 'solid'], body: {static: true, collider: 'circle'}, interact: {prompt: 'Talk', dialogue: 'wanderer', radius: 40}, data: {name: hash(cx, cy, 5) < 0.5 ? 'Ilka' : 'Osric'}}) }"
+      ]
+    },
+    {
+      "each": "player",
+      "when": "!self.data.dialogue && !state.dialogue",
+      "do": [
+        "let mx = axis('x') + (held('right') ? 1 : 0) - (held('left') ? 1 : 0)",
+        "let my = axis('y') + (held('down') ? 1 : 0) - (held('up') ? 1 : 0)",
+        "let l = sqrt(mx * mx + my * my); if (l > 1) { mx = mx / l; my = my / l }",
+        "self.vx = self.vx + (mx * 140 - self.vx) * min(1, 10 * dt)",
+        "self.vy = self.vy + (my * 140 - self.vy) * min(1, 10 * dt)",
+        "if (l > 0.1) self.rot = atan2(my, mx)"
+      ]
+    },
+    {
+      "each": "player",
+      "when": "self.data.dialogue || state.dialogue",
+      "do": "self.vx = 0; self.vy = 0"
+    },
+    {
+      "on": "contact",
+      "tags": [
+        "player",
+        "coin"
+      ],
+      "do": "despawn(b); a.data.gold += 1; sound('coin'); spawn(null, {x: b.x, y: b.y, emitter: {shape: 'spark', burst: 8, rate: 0, life: [0.2, 0.4], speed: [30, 80]}, data: {ttl: 0.5}})"
+    },
+    {
+      "each": "player",
+      "do": "self.data.hud = (self.data.title ? self.data.name + ' ' + self.data.title + '  ' : '') + 'GOLD ' + str(self.data.gold) + (self.data.lantern ? '  LANTERN' : '') + '  ' + str(floor(self.x / 32)) + ',' + str(floor(self.y / 32))"
+    },
+    {
+      "do": "let p = first('player'); state.hud = p ? p.data.hud : ''"
+    }
+  ],
+  "sounds": {
+    "coin": {
+      "wave": "triangle",
+      "freq": 880,
+      "slide": 600,
+      "decay": 0.12,
+      "volume": 0.25
+    }
+  }
 }

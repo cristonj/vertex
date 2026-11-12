@@ -1,0 +1,159 @@
+{
+  "vertex": 1,
+  "title": "Breaker",
+  "description": "Clear the neon wall. Move with arrows or A/D; space serves. Angle the ball with the edge of your paddle. Three lives.",
+  "width": 480,
+  "height": 360,
+  "background": "#0b0e1a",
+  "shapes": {
+    "paddle": {
+      "d": "M-36 -5h72v10h-72Z",
+      "fill": "#7df9ff"
+    },
+    "ball": {
+      "d": "M-5 0A5 5 0 1 0 5 0A5 5 0 1 0 -5 0Z",
+      "fill": "#fff"
+    },
+    "brick": {
+      "d": "M-26 -7.5h52v15h-52Z",
+      "fill": "#ff5d73",
+      "stroke": "#ffabc0",
+      "width": 1.5
+    }
+  },
+  "sounds": {
+    "hit": {
+      "wave": "triangle",
+      "freq": 660,
+      "slide": 900,
+      "decay": 0.12,
+      "volume": 0.2
+    },
+    "lose": {
+      "wave": "saw",
+      "freq": 180,
+      "slide": -120,
+      "decay": 0.4,
+      "volume": 0.2
+    }
+  },
+  "state": {
+    "score": 0,
+    "over": false,
+    "hud": "",
+    "lives": 3,
+    "level": 1
+  },
+  "keys": {
+    "ArrowLeft": "left",
+    "ArrowRight": "right",
+    "a": "left",
+    "d": "right",
+    " ": "fire",
+    "Enter": "start"
+  },
+  "systems": [
+    "motion",
+    "lifetime",
+    {
+      "collideOutline": [
+        [
+          "ball",
+          "brick"
+        ]
+      ]
+    },
+    "rules"
+  ],
+  "scenes": {
+    "play": {
+      "state": {
+        "score": 0,
+        "over": false,
+        "hud": "",
+        "lives": 3,
+        "level": 1
+      },
+      "entities": [
+        {
+          "id": "paddle",
+          "shape": "paddle",
+          "x": 240,
+          "y": 324,
+          "tags": [
+            "paddle"
+          ]
+        },
+        {
+          "id": "ball",
+          "shape": "ball",
+          "x": 240,
+          "y": 311,
+          "tags": [
+            "ball"
+          ],
+          "data": {
+            "ready": true
+          }
+        },
+        {
+          "id": "info",
+          "text": "SPACE TO SERVE   3 LIVES",
+          "x": 240,
+          "y": 352,
+          "size": 12,
+          "stroke": "#7df9ff",
+          "width": 1.5
+        }
+      ]
+    }
+  },
+  "rules": [
+    {
+      "on": "start",
+      "do": "goto('play')"
+    },
+    {
+      "on": "scene",
+      "when": "event.name == 'play'",
+      "do": "repeat (35) { spawn('brick', {x: 54 + (i % 7) * 62, y: 60 + floor(i / 7) * 25, fill: ['#ff5d73','#ff9f43','#ffcf5a','#7ee081','#7df9ff'][floor(i / 7)], tags: ['brick']}) }"
+    },
+    {
+      "each": "paddle",
+      "when": "!state.over",
+      "do": "self.x = clamp(self.x + ((held('right') ? 1 : 0) - (held('left') ? 1 : 0)) * 360 * dt, 38, W - 38)"
+    },
+    {
+      "each": "ball",
+      "when": "!state.over",
+      "do": [
+        "let p = get('paddle')",
+        "if (self.data.ready) { self.x = p.x; self.y = 311; if (pressed('fire')) { self.data.ready = false; self.vx = 125; self.vy = -220 } }",
+        "if (self.x < 6) { self.x = 6; self.vx = abs(self.vx) }; if (self.x > W - 6) { self.x = W - 6; self.vx = -abs(self.vx) }; if (self.y < 30) { self.y = 30; self.vy = abs(self.vy) }",
+        "if (self.vy > 0 && self.y >= 314 && self.y <= 330 && abs(self.x - p.x) < 41) { self.y = 313; self.vx = (self.x - p.x) * 6; self.vy = -max(180, 270 - abs(self.vx) * 0.25); sound('hit') }",
+        "if (self.y > H + 8) { state.lives -= 1; self.vx = 0; self.vy = 0; self.data.ready = true; sound('lose'); if (state.lives <= 0) state.over = true }"
+      ]
+    },
+    {
+      "on": "hit",
+      "tags": [
+        "ball",
+        "brick"
+      ],
+      "when": "!state.over",
+      "do": "if (alive(b)) { despawn(b); a.y = a.vy < 0 ? b.y + 14 : b.y - 14; a.vy = -a.vy; state.score += 10; sound('hit') }"
+    },
+    {
+      "do": "if (!state.over && state.scene == 'play' && count('brick') == 0 && frame > 1) { state.over = true; get('ball').vx = 0; get('ball').vy = 0; spawn(null, {text: 'WALL CLEARED', size: 26, x: 240, y: 180, stroke: '#7ee081', width: 2}) }"
+    },
+    {
+      "do": "let t = get('info'); if (t) t.text = 'LIVES ' + str(state.lives) + '   SPACE SERVES   ARROWS MOVE'"
+    },
+    {
+      "do": "if (state.over && pressed('start')) goto('play')"
+    },
+    {
+      "do": "state.hud = 'SCORE ' + str(state.score) + (state.over ? '   ENTER TO RESTART' : '')"
+    }
+  ]
+}

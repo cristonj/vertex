@@ -26,12 +26,13 @@ function script(actions, seed, frames, pointer, size) {
 
 // level "core" cases must match bit-for-bit in every implementation; "extended" cases use
 // implementation-tolerant math (trig/pow) and are expected, not required, to match.
+// Frozen demo fixtures preserve the published digests while live demos evolve.
 const cartridges = [
   ['conformance/cartridges/torture.json', 'core'],
-  ['examples/starfall/starfall.json', 'core'],
+  ['conformance/cartridges/starfall-v1.json', 'core'],
   ['conformance/cartridges/physics.json', 'core'],
   ['conformance/cartridges/streaming.json', 'core'],
-  ['examples/ascent/ascent.json', 'extended'],
+  ['conformance/cartridges/ascent-v1.json', 'extended'],
 ];
 const cases = [];
 for (const [path, level] of cartridges) {

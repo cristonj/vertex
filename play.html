@@ -72,7 +72,7 @@
       canvas.style.aspectRatio = `${W} / ${H}`;
       canvas.style.width = `min(100%, ${W * 2}px, calc((100dvh - 96px) * ${W / H}))`;
       $('title').textContent = doc.title ?? 'Untitled';
-      $('size').textContent = `${(source.length / 1024).toFixed(1)} KB`;
+      $('size').textContent = `${(new TextEncoder().encode(source).byteLength / 1024).toFixed(1)} KiB source`;
       const actions = [...new Set(Object.values(doc.keys ?? {}))];
       $('keys').textContent = Object.entries(doc.keys ?? {}).map(([k, a]) => `${k === ' ' ? 'space' : k.replace('Arrow', '')}: ${a}`).join(' · ');
       document.title = `${doc.title ?? 'Untitled'} — Vertex`;

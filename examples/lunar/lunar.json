@@ -1,0 +1,157 @@
+{
+  "vertex": 1,
+  "title": "Lunar",
+  "description": "Land upright on the amber pad. Left/right rotate, up or space fires the thruster. Watch fuel and descent speed; enter retries.",
+  "width": 480,
+  "height": 360,
+  "background": "#0b0e1a",
+  "shapes": {
+    "lander": {
+      "parts": [
+        {
+          "d": "M-8 -5L0 -12L8 -5V4H-8Z",
+          "fill": "#d9e5ff",
+          "stroke": "#7df9ff",
+          "width": 2
+        },
+        {
+          "d": "M-6 4L-12 12M6 4L12 12M-15 12H-8M8 12H15",
+          "fill": "none",
+          "stroke": "#ffcf5a",
+          "width": 2
+        }
+      ]
+    },
+    "flame": {
+      "d": "M-4 5L0 20L4 5Z",
+      "fill": "#ff9f43"
+    },
+    "pad": {
+      "d": "M-40 -2.5h80v5h-80Z",
+      "fill": "#ffcf5a"
+    },
+    "star": {
+      "d": "M-0.75 -0.75h1.5v1.5h-1.5Z",
+      "fill": "#586786"
+    }
+  },
+  "sounds": {
+    "hit": {
+      "wave": "triangle",
+      "freq": 660,
+      "slide": 900,
+      "decay": 0.12,
+      "volume": 0.2
+    },
+    "lose": {
+      "wave": "saw",
+      "freq": 180,
+      "slide": -120,
+      "decay": 0.4,
+      "volume": 0.2
+    }
+  },
+  "state": {
+    "score": 0,
+    "over": false,
+    "hud": "",
+    "fuel": 100,
+    "landed": false
+  },
+  "keys": {
+    "ArrowLeft": "left",
+    "ArrowRight": "right",
+    "a": "left",
+    "d": "right",
+    " ": "fire",
+    "Enter": "start",
+    "ArrowUp": "up",
+    "w": "up"
+  },
+  "systems": [
+    "motion",
+    "rules"
+  ],
+  "scenes": {
+    "play": {
+      "state": {
+        "score": 0,
+        "over": false,
+        "hud": "",
+        "fuel": 100,
+        "landed": false
+      },
+      "entities": [
+        {
+          "id": "player",
+          "shape": "lander",
+          "x": 80,
+          "y": 80,
+          "vx": 30,
+          "tags": [
+            "lander"
+          ]
+        },
+        {
+          "id": "flame",
+          "shape": "flame",
+          "x": 80,
+          "y": 80,
+          "opacity": 0
+        },
+        {
+          "id": "pad",
+          "shape": "pad",
+          "x": 350,
+          "y": 314
+        },
+        {
+          "id": "info",
+          "text": "ARROWS TURN   SPACE THRUST",
+          "x": 240,
+          "y": 350,
+          "size": 12,
+          "stroke": "#7df9ff",
+          "width": 1.5
+        },
+        {
+          "d": "M0 314H480V360H0Z",
+          "x": 0,
+          "y": 0,
+          "fill": "#1e2940"
+        }
+      ]
+    }
+  },
+  "rules": [
+    {
+      "on": "start",
+      "do": "goto('play')"
+    },
+    {
+      "on": "scene",
+      "when": "event.name == 'play'",
+      "do": "repeat (35) spawn('star', {x: rand(10, W - 10), y: rand(36, 240)})"
+    },
+    {
+      "each": "lander",
+      "when": "!state.over",
+      "do": [
+        "self.rot += ((held('right') ? 1 : 0) - (held('left') ? 1 : 0)) * 2.3 * dt",
+        "self.vy += 42 * dt; let thrust = (held('fire') || held('up')) && state.fuel > 0",
+        "if (thrust) { self.vx += sin(self.rot) * 100 * dt; self.vy -= cos(self.rot) * 100 * dt; state.fuel = max(0, state.fuel - 12 * dt) }",
+        "let f = get('flame'); f.x = self.x; f.y = self.y; f.rot = self.rot; f.opacity = thrust ? 1 : 0",
+        "if (self.y >= 300 || self.x < 12 || self.x > W - 12 || self.y < 28) { state.landed = self.y >= 300 && abs(self.x - 350) < 30 && abs(self.vx) < 20 && abs(self.vy) < 35 && abs(sin(self.rot)) < 0.2 && cos(self.rot) > 0; state.over = true; if (state.landed) { state.score = 100 + floor(state.fuel * 5); sound('hit') } else sound('lose'); self.vx = 0; self.vy = 0; f.opacity = 0; spawn(null, {text: state.landed ? 'TOUCHDOWN' : 'HARD LANDING', size: 26, x: 240, y: 170, stroke: state.landed ? '#7ee081' : '#ff5d73', width: 2}) }"
+      ]
+    },
+    {
+      "do": "let p = get('player'); let t = get('info'); if (t && p) t.text = 'FUEL ' + str(floor(state.fuel)) + '   VX ' + str(round(p.vx)) + '   VY ' + str(round(p.vy))"
+    },
+    {
+      "do": "if (state.over && pressed('start')) goto('play')"
+    },
+    {
+      "do": "state.hud = 'SCORE ' + str(state.score) + (state.over ? '   ENTER TO RESTART' : '')"
+    }
+  ]
+}

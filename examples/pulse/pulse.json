@@ -1,0 +1,177 @@
+{
+  "vertex": 1,
+  "title": "Pulse",
+  "description": "A formation shooter. Arrows or A/D move; hold space to fire. Clear waves, dodge return fire, protect three shields.",
+  "width": 480,
+  "height": 360,
+  "background": "#0b0e1a",
+  "shapes": {
+    "ship": {
+      "d": "M0 -14L15 10H5L0 5L-5 10H-15Z",
+      "fill": "#7df9ff"
+    },
+    "alien": {
+      "d": "M-13 -6L-7 -12L-3 -6H3L7 -12L13 -6V6H8V11H3V5H-3V11H-8V6H-13Z",
+      "fill": "#b79aff"
+    },
+    "shot": {
+      "d": "M-1.5 -6h3v12h-3Z",
+      "fill": "#ffcf5a"
+    },
+    "bolt": {
+      "d": "M-2.5 -5h5v10h-5Z",
+      "fill": "#ff5d73"
+    },
+    "spark": {
+      "d": "M-3 0H3M0 -3V3",
+      "fill": "none",
+      "stroke": "#ffcf5a",
+      "width": 2
+    }
+  },
+  "sounds": {
+    "hit": {
+      "wave": "triangle",
+      "freq": 660,
+      "slide": 900,
+      "decay": 0.12,
+      "volume": 0.2
+    },
+    "lose": {
+      "wave": "saw",
+      "freq": 180,
+      "slide": -120,
+      "decay": 0.4,
+      "volume": 0.2
+    }
+  },
+  "state": {
+    "score": 0,
+    "over": false,
+    "hud": "",
+    "lives": 3,
+    "wave": 0,
+    "dir": 1,
+    "inv": 0,
+    "cool": 0,
+    "fireT": 1
+  },
+  "keys": {
+    "ArrowLeft": "left",
+    "ArrowRight": "right",
+    "a": "left",
+    "d": "right",
+    " ": "fire",
+    "Enter": "start"
+  },
+  "systems": [
+    "motion",
+    "lifetime",
+    {
+      "collideOutline": [
+        [
+          "shot",
+          "alien"
+        ],
+        [
+          "player",
+          "bolt"
+        ]
+      ]
+    },
+    "rules"
+  ],
+  "scenes": {
+    "play": {
+      "state": {
+        "score": 0,
+        "over": false,
+        "hud": "",
+        "lives": 3,
+        "wave": 0,
+        "dir": 1,
+        "inv": 0,
+        "cool": 0,
+        "fireT": 1
+      },
+      "entities": [
+        {
+          "id": "player",
+          "shape": "ship",
+          "x": 240,
+          "y": 320,
+          "tags": [
+            "player"
+          ]
+        },
+        {
+          "id": "info",
+          "text": "HOLD SPACE TO FIRE",
+          "x": 240,
+          "y": 352,
+          "size": 12,
+          "stroke": "#7df9ff",
+          "width": 1.5
+        }
+      ]
+    }
+  },
+  "rules": [
+    {
+      "on": "start",
+      "do": "goto('play')"
+    },
+    {
+      "on": "scene",
+      "when": "event.name == 'play'",
+      "do": ""
+    },
+    {
+      "do": "if (!state.over && count('alien') == 0 && state.scene == 'play') { state.wave += 1; state.dir = 1; repeat (24) { spawn('alien', {x: 70 + (i % 8) * 46, y: 60 + floor(i / 8) * 34, tags: ['alien'], fill: ['#b79aff','#ff7b9c','#7ee081'][floor(i / 8)]}) } }"
+    },
+    {
+      "each": "player",
+      "when": "!state.over",
+      "do": [
+        "self.x = clamp(self.x + ((held('right') ? 1 : 0) - (held('left') ? 1 : 0)) * 270 * dt, 20, W - 20)",
+        "state.cool -= dt; state.inv = max(0, state.inv - dt); self.opacity = state.inv > 0 && floor(time * 14) % 2 == 0 ? 0.3 : 1",
+        "if (held('fire') && state.cool <= 0) { spawn('shot', {x: self.x, y: self.y - 18, vy: -420, tags: ['shot'], data: {ttl: 1}}); state.cool = 0.2 }"
+      ]
+    },
+    {
+      "do": "if (!state.over) { let edge = false; let enemies = all('alien'); repeat (count('alien')) { let e = enemies[i]; if ((e.x > W - 25 && state.dir > 0) || (e.x < 25 && state.dir < 0)) edge = true }; if (edge) { state.dir = -state.dir; repeat (count('alien')) enemies[i].y += 12 }; state.fireT -= dt; if (state.fireT <= 0 && count('alien') > 0) { let e = enemies[floor(rand(0, count('alien')))]; spawn('bolt', {x: e.x, y: e.y + 14, vy: 155 + state.wave * 12, tags: ['bolt'], data: {ttl: 3}}); state.fireT = max(0.22, 0.9 - state.wave * 0.08) } }"
+    },
+    {
+      "each": "alien",
+      "when": "!state.over",
+      "do": "self.x += state.dir * (22 + state.wave * 7) * dt; if (self.y > 286) state.over = true"
+    },
+    {
+      "on": "hit",
+      "tags": [
+        "shot",
+        "alien"
+      ],
+      "when": "!state.over",
+      "do": "despawn(a); despawn(b); state.score += 20; sound('hit'); repeat (4) spawn('spark', {x: b.x, y: b.y, vx: rand(-80,80), vy: rand(-80,80), data: {ttl: 0.25}})"
+    },
+    {
+      "on": "hit",
+      "tags": [
+        "player",
+        "bolt"
+      ],
+      "when": "!state.over && state.inv <= 0",
+      "do": "despawn(b); state.lives -= 1; state.inv = 1.2; sound('lose'); if (state.lives <= 0) state.over = true"
+    },
+    {
+      "do": "if (state.over) { let e = all('shot'); repeat (count('shot')) e[i].vy = 0; e = all('bolt'); repeat (count('bolt')) e[i].vy = 0 }; let t = get('info'); if (t) t.text = 'WAVE ' + str(state.wave) + '   SHIELDS ' + str(state.lives)"
+    },
+    {
+      "do": "if (state.over && pressed('start')) goto('play')"
+    },
+    {
+      "do": "state.hud = 'SCORE ' + str(state.score) + (state.over ? '   ENTER TO RESTART' : '')"
+    }
+  ]
+}

@@ -36,6 +36,7 @@
     .games { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
     .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 6px; color: var(--fg); }
     .card:hover { border-color: #7df9ff66; text-decoration: none; }
+    .card small { color: var(--dim); font-size: 12px; margin-top: 4px; }
     .card b { color: var(--hi); font-size: 17px; }
     .card .meta { color: var(--dim); font: 12px ui-monospace, monospace; margin-top: auto; padding-top: 8px; }
     .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
@@ -65,7 +66,7 @@
           game logic is a tiny sandboxed rules language, and every run is a replay a few KB long. A whole game fits in a link,
           and humans and AI agents use the same API.</p>
         <div class="cta">
-          <a class="btn primary" href="play.html">Play Starfall</a>
+          <a class="btn primary" href="play.html?src=examples/apex/apex.json">Play Apex</a>
           <a class="btn" href="play.html?src=examples/ascent/ascent.json">Play Ascent</a>
           <a class="btn" href="docs/tutorial.html">Tutorial</a>
         </div>
@@ -75,21 +76,29 @@
     </section>
 
     <div class="facts">
-      <div><b>~2 KB</b><small>a complete game, as JSON</small></div>
+      <div><b>11</b><small>playable vector games</small></div>
       <div><b>0</b><small>dependencies</small></div>
       <div><b>2</b><small>independent runtimes, bit-identical</small></div>
       <div><b>500</b><small>players per server process, ~24k awake entities</small></div>
     </div>
 
     <h2>Games</h2>
-    <p class="sub">Every one of these is a file you can read, fork and share as a link. Press <span class="mono">`</span> in the player to inspect and edit it live.</p>
+    <p class="sub">Every game is a file you can read and fork. Sizes below measure the game source; gzip uses level 9. The shared engine, player and icons are extra. Press <span class="mono">`</span> in the player to inspect and edit it live.</p>
+    <!-- GAMES:START -->
     <div class="games">
-      <a class="card" href="play.html"><b>Starfall</b>Catch stars, dodge shards. Spawning, scoring and difficulty are all rules.<span class="meta">cartridge · 2.3 KB</span></a>
-      <a class="card" href="play.html?src=examples/ascent/ascent.json"><b>Ascent</b>A two-level platformer: physics, scenes, camera follow, particles, timers.<span class="meta">cartridge · 6 KB</span></a>
-      <a class="card" href="play.html?src=examples/skyline/skyline.json"><b>Skyline</b>3D drive through a vector city: meshes, extrusions, fog, chase camera.<span class="meta">cartridge · 3D · 4 KB</span></a>
-      <a class="card" href="play.html?src=examples/frontier/frontier.json"><b>Frontier</b>An endless procedural world with NPC dialogue. Also runs as an MMO server.<span class="meta">cartridge · streaming · multiplayer</span></a>
-      <a class="card" href="examples/drift/"><b>Drift</b>Vector asteroids-style shooter written in JS. Hold R to rewind time.<span class="meta">JS module · outline collision</span></a>
+      <a class="card" href="play.html?src=examples/apex/apex.json"><img src="examples/apex/icon.svg" alt="" width="56" height="56" loading="lazy"><b>Apex</b><span>Perspective racing. Sunset bends, traffic, boost and timed checkpoints.</span><small>Arrows drive · Space boosts</small><span class="meta" title="8,663 source bytes; 2,568 gzip bytes">8.5 KiB source · 2.5 KiB gzip</span></a>
+      <a class="card" href="examples/drift/"><img src="examples/drift/icon.svg" alt="" width="56" height="56" loading="lazy"><b>Drift</b><span>The original vector space shooter, with outline collisions and time rewind.</span><small>Arrows fly · Space fires · R rewinds</small><span class="meta" title="3,265 source bytes; 1,422 gzip bytes">3.2 KiB source · 1.4 KiB gzip</span></a>
+      <a class="card" href="play.html?src=examples/breaker/breaker.json"><img src="examples/breaker/icon.svg" alt="" width="56" height="56" loading="lazy"><b>Breaker</b><span>Clear a neon wall. Paddle placement controls the bounce. Three lives.</span><small>← → move · Space serves</small><span class="meta" title="4,158 source bytes; 1,500 gzip bytes">4.1 KiB source · 1.5 KiB gzip</span></a>
+      <a class="card" href="play.html?src=examples/pulse/pulse.json"><img src="examples/pulse/icon.svg" alt="" width="56" height="56" loading="lazy"><b>Pulse</b><span>Formation shooting, return fire, shields and increasingly fast waves.</span><small>← → move · Hold Space to fire</small><span class="meta" title="4,802 source bytes; 1,708 gzip bytes">4.7 KiB source · 1.7 KiB gzip</span></a>
+      <a class="card" href="play.html?src=examples/serpent/serpent.json"><img src="examples/serpent/icon.svg" alt="" width="56" height="56" loading="lazy"><b>Serpent</b><span>Grow a luminous snake. Each fruit speeds up the grid.</span><small>Arrows / WASD steer</small><span class="meta" title="4,329 source bytes; 1,486 gzip bytes">4.2 KiB source · 1.5 KiB gzip</span></a>
+      <a class="card" href="play.html?src=examples/rally/rally.json"><img src="examples/rally/icon.svg" alt="" width="56" height="56" loading="lazy"><b>Rally</b><span>A paddle duel against a beatable CPU. First to seven takes the match.</span><small>↑ ↓ move · Space serves</small><span class="meta" title="4,365 source bytes; 1,416 gzip bytes">4.3 KiB source · 1.4 KiB gzip</span></a>
+      <a class="card" href="play.html?src=examples/lunar/lunar.json"><img src="examples/lunar/icon.svg" alt="" width="56" height="56" loading="lazy"><b>Lunar</b><span>A fuel-limited lander. Control angle and velocity for a soft touchdown.</span><small>← → rotate · ↑ / Space thrust</small><span class="meta" title="4,057 source bytes; 1,484 gzip bytes">4.0 KiB source · 1.4 KiB gzip</span></a>
+      <a class="card" href="play.html?src=examples/starfall/starfall.json"><img src="examples/starfall/icon.svg" alt="" width="56" height="56" loading="lazy"><b>Starfall</b><span>Catch gold, dodge red, chain combos and collect shields.</span><small>← → move · Enter retries</small><span class="meta" title="7,283 source bytes; 2,111 gzip bytes">7.1 KiB source · 2.1 KiB gzip</span></a>
+      <a class="card" href="play.html?src=examples/ascent/ascent.json"><img src="examples/ascent/icon.svg" alt="" width="56" height="56" loading="lazy"><b>Ascent</b><span>Two platforming stages with variable jumps, gems and a summit.</span><small>← → move · Space jumps</small><span class="meta" title="9,965 source bytes; 2,014 gzip bytes">9.7 KiB source · 2.0 KiB gzip</span></a>
+      <a class="card" href="play.html?src=examples/skyline/skyline.json"><img src="examples/skyline/icon.svg" alt="" width="56" height="56" loading="lazy"><b>Skyline</b><span>A 3D city time trial. Collect six gems and dodge the buildings.</span><small>Arrows / WASD drive</small><span class="meta" title="11,053 source bytes; 1,995 gzip bytes">10.8 KiB source · 1.9 KiB gzip</span></a>
+      <a class="card" href="play.html?src=examples/frontier/frontier.json"><img src="examples/frontier/icon.svg" alt="" width="56" height="56" loading="lazy"><b>Frontier</b><span>Explore an endless forest, gather gold and talk to wanderers. Solo or online.</span><small>WASD explore · E talks</small><span class="meta" title="7,978 source bytes; 2,577 gzip bytes">7.8 KiB source · 2.5 KiB gzip</span></a>
     </div>
+    <!-- GAMES:END -->
 
     <h2>A game is one document</h2>
     <p class="sub">No build step, no assets, no host code. Safe to load from anywhere, and it runs the same in every Vertex implementation.</p>

@@ -1,0 +1,148 @@
+{
+  "vertex": 1,
+  "title": "Serpent",
+  "description": "A grid arcade snake. Arrows or WASD steer. Eat amber fruit, avoid the walls and your tail. Enter restarts.",
+  "width": 480,
+  "height": 360,
+  "background": "#0b0e1a",
+  "shapes": {
+    "head": {
+      "d": "M-7 -7h14v14h-14Z",
+      "fill": "#7df9ff",
+      "stroke": "#c8fcff",
+      "width": 1.5
+    },
+    "tail": {
+      "d": "M-6 -6h12v12h-12Z",
+      "fill": "#348d95"
+    },
+    "food": {
+      "d": "M0 -7L7 0L0 7L-7 0Z",
+      "fill": "#ffcf5a"
+    }
+  },
+  "sounds": {
+    "hit": {
+      "wave": "triangle",
+      "freq": 660,
+      "slide": 900,
+      "decay": 0.12,
+      "volume": 0.2
+    },
+    "lose": {
+      "wave": "saw",
+      "freq": 180,
+      "slide": -120,
+      "decay": 0.4,
+      "volume": 0.2
+    }
+  },
+  "state": {
+    "score": 0,
+    "over": false,
+    "hud": "",
+    "dx": 1,
+    "dy": 0,
+    "tick": 0,
+    "length": 4,
+    "seq": 0,
+    "nextX": 1,
+    "nextY": 0
+  },
+  "keys": {
+    "ArrowLeft": "left",
+    "ArrowRight": "right",
+    "a": "left",
+    "d": "right",
+    " ": "fire",
+    "Enter": "start",
+    "ArrowUp": "up",
+    "ArrowDown": "down",
+    "w": "up",
+    "s": "down"
+  },
+  "systems": [
+    "rules"
+  ],
+  "scenes": {
+    "play": {
+      "state": {
+        "score": 0,
+        "over": false,
+        "hud": "",
+        "dx": 1,
+        "dy": 0,
+        "tick": 0,
+        "length": 4,
+        "seq": 0,
+        "nextX": 1,
+        "nextY": 0
+      },
+      "entities": [
+        {
+          "id": "head",
+          "shape": "head",
+          "x": 168,
+          "y": 184,
+          "tags": [
+            "head"
+          ]
+        },
+        {
+          "id": "food",
+          "shape": "food",
+          "x": 328,
+          "y": 184
+        },
+        {
+          "id": "info",
+          "text": "EAT GOLD   AVOID YOUR TAIL",
+          "x": 240,
+          "y": 350,
+          "size": 12,
+          "stroke": "#7df9ff",
+          "width": 1.5
+        },
+        {
+          "d": "M15 39H465V329H15Z",
+          "x": 0,
+          "y": 0,
+          "stroke": "#263652",
+          "fill": "none",
+          "width": 2
+        }
+      ]
+    }
+  },
+  "rules": [
+    {
+      "on": "start",
+      "do": "goto('play')"
+    },
+    {
+      "on": "scene",
+      "when": "event.name == 'play'",
+      "do": "repeat (3) spawn('tail', {x: 152 - i * 16, y: 184, tags: ['tail'], data: {seq: -i}})"
+    },
+    {
+      "do": "if (!state.over) { if (pressed('left') && state.dx != 1) { state.nextX = -1; state.nextY = 0 }; if (pressed('right') && state.dx != -1) { state.nextX = 1; state.nextY = 0 }; if (pressed('up') && state.dy != 1) { state.nextX = 0; state.nextY = -1 }; if (pressed('down') && state.dy != -1) { state.nextX = 0; state.nextY = 1 } }"
+    },
+    {
+      "each": "head",
+      "when": "!state.over",
+      "do": [
+        "state.tick += dt",
+        "if (state.tick >= max(0.065, 0.16 - state.score * 0.0005)) { state.tick = 0; state.dx = state.nextX; state.dy = state.nextY; state.seq += 1; spawn('tail', {x: self.x, y: self.y, tags: ['tail'], data: {seq: state.seq}}); self.x += state.dx * 16; self.y += state.dy * 16; let f = get('food'); if (self.x == f.x && self.y == f.y) { state.length += 1; state.score += 10; sound('hit'); state.foodNeeded = true }; let parts = all('tail'); repeat (count('tail')) { let p = parts[i]; if (p.data.seq <= state.seq - state.length + 1) despawn(p) }; parts = all('tail'); repeat (count('tail')) { if (parts[i].x == self.x && parts[i].y == self.y) state.over = true }; if (self.x < 24 || self.x > 456 || self.y < 56 || self.y > 312) state.over = true }"
+      ]
+    },
+    {
+      "do": "if (state.foodNeeded && !state.over) { let f = get('food'); let done = false; let offset = floor(rand(0, 476)); repeat (476) { if (!done) { let n = (offset + i) % 476; let x = 24 + (n % 28) * 16; let y = 56 + floor(n / 28) * 16; let h = get('head'); let free = x != h.x || y != h.y; let parts = all('tail'); repeat (count('tail')) { if (parts[i].x == x && parts[i].y == y) free = false }; if (free) { f.x = x; f.y = y; done = true } } }; if (!done) state.over = true; state.foodNeeded = false }"
+    },
+    {
+      "do": "if (state.over && pressed('start')) goto('play')"
+    },
+    {
+      "do": "state.hud = 'SCORE ' + str(state.score) + (state.over ? '   ENTER TO RESTART' : '')"
+    }
+  ]
+}

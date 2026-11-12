@@ -278,7 +278,82 @@ export function radius3d(world, e) {
   return shape._r3 * Math.abs(e.scale ?? 1);
 }
 
-/** Sphere-vs-sphere collision between tag pairs in 3D. Emits the same `hit` events as collide(). */
+/** Local axis-aligned bounds of a shape's mesh, cached on the compiled shape. */
+function meshBounds(shape) {
+  if (!shape) return null;
+  if (shape._mb !== undefined) return shape._mb;
+  const mesh = meshOf(shape);
+  if (!mesh || !mesh.v.length) return (shape._mb = null);
+  const min = [Infinity, Infinity, Infinity], max = [-Infinity, -Infinity, -Infinity];
+  for (const p of mesh.v) for (let i = 0; i < 3; i++) {
+    if (p[i] < min[i]) min[i] = p[i];
+    if (p[i] > max[i]) max[i] = p[i];
+  }
+  return (shape._mb = { min, max });
+}
+
+/**
+ * World-space oriented box of a 3D entity: { c, h, axes } where `c` is the center,
+ * `h` the half extents and `axes` the three rotated unit axes.
+ * The box is the mesh's local AABB taken through the entity's rotation and scale, so a
+ * tower collides where it looks like a tower, not where a sphere around it would be.
+ */
+function entityBox3d(world, e) {
+  const shape = world.shapes[e.shape];
+  const mb = meshBounds(shape);
+  if (!mb) return null;
+  const s = Math.abs(e.scale ?? 1);
+  const local = [0, 1, 2].map((i) => (mb.min[i] + mb.max[i]) / 2);
+  const h = [0, 1, 2].map((i) => ((mb.max[i] - mb.min[i]) / 2) * s);
+  const M = rotation(e.rx ?? 0, e.ry ?? 0, e.rz ?? 0);
+  const signed = e.scale ?? 1;
+  const off = rot(M, local.map((v) => v * signed));
+  const c = [e.x + off[0], e.y + off[1], (e.z ?? 0) + off[2]];
+  // columns of M are the box's unit axes
+  const axes = [
+    [M[0], M[3], M[6]],
+    [M[1], M[4], M[7]],
+    [M[2], M[5], M[8]],
+  ];
+  return { c, h, axes };
+}
+
+/** Separating-axis test for two oriented boxes (3 face axes each + 9 edge crosses). */
+function boxesOverlap3d(a, b) {
+  const d = [b.c[0] - a.c[0], b.c[1] - a.c[1], b.c[2] - a.c[2]];
+  const dot = (u, v) => u[0] * v[0] + u[1] * v[1] + u[2] * v[2];
+  const cross = (u, v) => [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]];
+  const test = (L) => {
+    const len2 = dot(L, L);
+    if (len2 < 1e-12) return true; // parallel edges: axis is redundant
+    let ra = 0, rb = 0;
+    for (let i = 0; i < 3; i++) {
+      ra += a.h[i] * Math.abs(dot(a.axes[i], L));
+      rb += b.h[i] * Math.abs(dot(b.axes[i], L));
+    }
+    return Math.abs(dot(d, L)) <= ra + rb + 1e-9 * Math.sqrt(len2);
+  };
+  for (const ax of a.axes) if (!test(ax)) return false;
+  for (const bx of b.axes) if (!test(bx)) return false;
+  for (const ax of a.axes) for (const bx of b.axes) if (!test(cross(ax, bx))) return false;
+  return true;
+}
+
+/** True when two 3D entities' oriented mesh bounds overlap. */
+function overlaps3d(world, a, b) {
+  const ba = entityBox3d(world, a), bb = entityBox3d(world, b);
+  if (!ba || !bb) return false;
+  // cheap sphere broadphase before the exact test
+  const ra = Math.hypot(...ba.h), rb = Math.hypot(...bb.h);
+  const dx = ba.c[0] - bb.c[0], dy = ba.c[1] - bb.c[1], dz = ba.c[2] - bb.c[2];
+  if (dx * dx + dy * dy + dz * dz > (ra + rb) ** 2) return false;
+  return boxesOverlap3d(ba, bb);
+}
+
+/**
+ * Box-vs-box collision between tag pairs in 3D. Emits the same `hit` events as collide().
+ * Uses each mesh's rotated local AABB; concave meshes still have a box hitbox.
+ */
 export function collide3d(pairs) {
   return (game) => {
     const w = game.world;
@@ -286,9 +361,7 @@ export function collide3d(pairs) {
       const A = w.query(ta), B = w.query(tb);
       for (const a of A) for (const b of B) {
         if (a === b) continue;
-        const r = radius3d(w, a) + radius3d(w, b);
-        const dx = a.x - b.x, dy = a.y - b.y, dz = (a.z ?? 0) - (b.z ?? 0);
-        if (dx * dx + dy * dy + dz * dz < r * r) game.emit('hit', { a: a.id, b: b.id, tags: [ta, tb] });
+        if (overlaps3d(w, a, b)) game.emit('hit', { a: a.id, b: b.id, tags: [ta, tb] });
       }
     }
   };
