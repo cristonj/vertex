@@ -94,6 +94,7 @@ export function toWAV(samples, sampleRate = SAMPLE_RATE) {
 /**
  * Browser: play every "sound" event the game emits, via WebAudio. Buffers are synthesized
  * once per sound name. Returns a detach function. Audio unlocks on the first user gesture.
+ * Set `game.muted = true` to silence (e.g. while a Timeline re-simulates during a seek).
  */
 export function attachAudio(game, { volume = 1 } = {}) {
   const AC = globalThis.AudioContext || globalThis.webkitAudioContext;
@@ -120,7 +121,7 @@ export function attachAudio(game, { volume = 1 } = {}) {
     for (const ev of evs) {
       if (ev.type !== 'sound') continue;
       const params = game.world.sounds?.[ev.name];
-      if (!params || ctx.state !== 'running') continue;
+      if (!params || game.muted || ctx.state !== 'running') continue;
       const src = ctx.createBufferSource();
       src.buffer = bufferFor(ev.name, params);
       src.connect(gain); src.start();

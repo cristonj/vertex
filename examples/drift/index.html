@@ -13,16 +13,36 @@
 </head>
 <body>
   <canvas id="c" width="1600" height="1200"></canvas>
-  <p>←/→ turn · ↑ thrust · space fire</p>
+  <p>←/→ turn · ↑ thrust · space fire · hold R to rewind time</p>
   <script type="module">
-    import { bindKeys, attachAudio } from '../../src/index.js';
+    import { bindKeys, attachAudio, Timeline } from '../../src/index.js';
     import { autoRenderer } from '../../src/webgl.js';
     import { createGame } from './drift.js';
-    const game = createGame({ seed: Date.now() });
-    bindKeys(game, { ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'thrust', ' ': 'fire' });
-    attachAudio(game);
+
+    // The game runs inside a Timeline: inputs are logged and checkpoints kept, so time is scrubbable.
+    const timeline = new Timeline(createGame, { seed: Date.now() >>> 0, every: 30 });
+    bindKeys(timeline, { ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'thrust', ' ': 'fire' });
+    attachAudio(timeline.game);
+    let rewinding = false;
+    addEventListener('keydown', (e) => { if (e.key === 'r') rewinding = true; });
+    addEventListener('keyup', (e) => { if (e.key === 'r') rewinding = false; });
+
     const renderer = await autoRenderer(document.getElementById('c'));  // WebGL2, else Canvas2D
-    game.run(renderer);
+    const dt = timeline.game.dt;
+    let acc = 0, last = performance.now();
+    requestAnimationFrame(function tick(now) {
+      acc += Math.min(0.25, (now - last) / 1000); last = now;
+      while (acc >= dt) {
+        acc -= dt;
+        if (rewinding) {
+          timeline.game.muted = true;
+          timeline.seek(timeline.frame - 2);          // 2x speed rewind
+          timeline.game.muted = false;
+        } else timeline.step(1);                       // acting after a rewind starts a new future
+      }
+      renderer.draw(timeline.game.world);
+      requestAnimationFrame(tick);
+    });
   </script>
 </body>
 </html>

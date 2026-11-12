@@ -13,11 +13,17 @@ import { assertValidScene } from './validate.js';
  */
 export class World {
   constructor(doc = {}) {
+    this.restore(doc);
+  }
+
+  /** Replace this world's contents in place (systems holding a reference keep working). */
+  restore(doc) {
     assertValidScene(doc);
     this.width = doc.width ?? 800;
     this.height = doc.height ?? 600;
     this.background = doc.background ?? '#000';
-    if (doc.camera) this.camera = { zoom: 1, rot: 0, ...doc.camera };
+    if (doc.camera) this.camera = { zoom: 1, rot: 0, ...doc.camera }; else delete this.camera;
+    const prev = this.shapes ?? {};
     this.shapes = {};
     this.entities = [];
     this.state = structuredClone(doc.state ?? {});
@@ -26,8 +32,13 @@ export class World {
     this.time = 0;
     this.frame = 0;
     this._nextId = 1;
-    for (const [name, s] of Object.entries(doc.shapes ?? {})) this.defineShape(name, s);
+    for (const [name, s] of Object.entries(doc.shapes ?? {})) {
+      // Reuse compiled geometry when unchanged, so rewinds don't re-tessellate GPU meshes.
+      if (prev[name] && JSON.stringify(prev[name].src) === JSON.stringify(s)) this.shapes[name] = prev[name];
+      else this.defineShape(name, s);
+    }
     for (const e of doc.entities ?? []) this.spawn(e);
+    return this;
   }
 
   /** Register a vector shape. Geometry is parsed once and cached (per part and combined). */

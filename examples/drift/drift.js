@@ -30,16 +30,15 @@ export function createGame(opts) {
   });
   for (let i = 0; i < 5; i++) spawnRock(game.random() * 800, game.random() < 0.5 ? 40 : 560);
 
-  let cooldown = 0;
   game
     .use((g, dt) => { // player control
       const s = w.get('ship'); if (!s) return;
       if (g.input.has('left')) s.rot -= 4 * dt;
       if (g.input.has('right')) s.rot += 4 * dt;
       if (g.input.has('thrust')) { s.vx += Math.cos(s.rot) * 300 * dt; s.vy += Math.sin(s.rot) * 300 * dt; }
-      cooldown -= dt;
-      if (g.input.has('fire') && cooldown <= 0) {
-        cooldown = 0.18;
+      s.data.cooldown = (s.data.cooldown ?? 0) - dt; // state lives in the world, not a closure
+      if (g.input.has('fire') && s.data.cooldown <= 0) {
+        s.data.cooldown = 0.18;
         g.sound('zap');
         w.spawn({ shape: 'bullet', x: s.x, y: s.y, rot: s.rot,
           vx: s.vx + Math.cos(s.rot) * 520, vy: s.vy + Math.sin(s.rot) * 520,

@@ -18,3 +18,5 @@ export { SpatialHash, forEachPair } from './spatial.js';
 export { synth, sequence, noteFreq, toWAV, attachAudio, SAMPLE_RATE } from './audio.js';
 export { WebGLRenderer, autoRenderer } from './webgl.js';
 export { fanTriangles, strokeTriangles, coverQuad } from './tess.js';
+export { Timeline, divergence } from './timeline.js';
+export { Lockstep, memoryTransport, broadcastTransport, held } from './lockstep.js';

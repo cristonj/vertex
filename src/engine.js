@@ -52,6 +52,29 @@ export class Game {
     return all;
   }
 
+  /**
+   * Full simulation state as plain JSON: world, clock, RNG and held input.
+   * Restoring it with loadState() resumes bit-identically — as long as systems keep their
+   * state in the world (world.state / entity.data), not in closures. That is the rule that
+   * makes rewind, branching and checkpoints cheap.
+   */
+  saveState() {
+    const w = this.world;
+    return {
+      world: structuredClone(w.toJSON()), frame: w.frame, time: w.time, nextId: w._nextId,
+      seed: this._seed, input: [...this.input], pressed: [...this.pressed],
+    };
+  }
+
+  loadState(st) {
+    const w = this.world.restore(structuredClone(st.world)); // in place: closures keep working
+    w.frame = st.frame; w.time = st.time; w._nextId = st.nextId;
+    this._seed = st.seed;
+    this.input = new Set(st.input);
+    this.pressed = new Set(st.pressed);
+    return this;
+  }
+
   /** Compact, JSON-safe view of the world — what an agent "observes". */
   snapshot() {
     const w = this.world;

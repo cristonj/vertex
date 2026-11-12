@@ -10,6 +10,7 @@ import { resolve, dirname, relative } from 'node:path';
 import { loadSceneModule, createFrom } from './load.js';
 import { Recorder, applyRecording, verifyReplay, digest } from './replay.js';
 import { toPNG } from './node.js';
+import { divergence } from './timeline.js';
 import { runMCPServer } from '../mcp/server.js';
 
 const OPTIONS = {
@@ -21,6 +22,8 @@ const OPTIONS = {
   png: { type: 'string' },
   record: { type: 'string' },
   json: { type: 'boolean' },
+  at: { type: 'string' },
+  width: { type: 'string' },
 };
 
 const USAGE = `vertex — the vector-native, agent-first game engine
@@ -35,6 +38,13 @@ const USAGE = `vertex — the vector-native, agent-first game engine
       Replay a recording exactly and verify it reproduces the recorded frame.
       Exit code 1 if the replay does not match (a bug report that always reproduces).
 
+  vertex play <recording.json> --at <frame> [--svg f.svg] [--png f.png] [--width W]
+      Scrub: render any frame of a recording (time is data — every frame is recoverable).
+
+  vertex diff <a.json> <b.json>
+      Replay two recordings of the same scene side by side and report the first frame
+      where their worlds differ (compare two strategies, or bisect a desync).
+
   vertex schema
       Print the JSON Schema for scene documents (schema/scene.schema.json).
 
@@ -47,6 +57,7 @@ export async function main(argv = process.argv.slice(2)) {
   try {
     if (cmd === 'run') await cmdRun(rest);
     else if (cmd === 'play') await cmdPlay(rest);
+    else if (cmd === 'diff') await cmdDiff(rest);
     else if (cmd === 'schema') cmdSchema(rest);
     else if (cmd === 'mcp') runMCPServer();
     else {
@@ -105,17 +116,34 @@ async function cmdPlay(args) {
 
   const mod = await loadSceneModule(findScene(rec.scene, recPath));
   const game = createFrom(mod, { seed: rec.seed, fps: rec.fps });
-  applyRecording(game, rec);
+  const at = num(values.at);
+  if (at !== undefined && (at < 0 || at > rec.steps)) throw new Error(`--at must be within 0..${rec.steps}`);
+  applyRecording(game, at !== undefined ? { ...rec, steps: at } : rec);
 
   let exact = true;
-  try { verifyReplay(game, rec); } catch (e) { exact = false; console.error(`vertex: ${e.message}`); }
+  if (at === undefined) {
+    try { verifyReplay(game, rec); } catch (e) { exact = false; console.error(`vertex: ${e.message}`); }
+  }
 
   const files = [];
+  const width = num(values.width);
   if (values.svg) { writeFileSync(values.svg, game.toSVG()); files.push(values.svg); }
-  if (values.png) { writeFileSync(values.png, toPNG(game.world)); files.push(values.png); }
+  if (values.png) { writeFileSync(values.png, toPNG(game.world, width ? { width, height: Math.round(width * game.world.height / game.world.width) } : {})); files.push(values.png); }
   report(game, files, values.json, false, null);
-  console.log(`replay ${exact ? 'exact' : 'MISMATCH'} (${rec.steps} steps from seed ${rec.seed})`);
+  if (at !== undefined) console.log(`scrubbed to frame ${at} of ${rec.steps}`);
+  else console.log(`replay ${exact ? 'exact' : 'MISMATCH'} (${rec.steps} steps from seed ${rec.seed})`);
   if (!exact) process.exitCode = 1;
+}
+
+async function cmdDiff(args) {
+  const { positionals } = parseArgs({ args, options: OPTIONS, allowPositionals: true });
+  const [pa, pb] = positionals;
+  if (!pa || !pb) throw new Error('usage: vertex diff <a.json> <b.json>');
+  const a = JSON.parse(readFileSync(pa, 'utf8')), b = JSON.parse(readFileSync(pb, 'utf8'));
+  const mod = await loadSceneModule(findScene(a.scene, pa));
+  const f = divergence((o) => createFrom(mod, o), a, b);
+  if (f === null) console.log(`identical for all ${Math.min(a.steps, b.steps)} shared frames`);
+  else console.log(`diverge at frame ${f}`);
 }
 
 function cmdSchema(args) {
