@@ -1,40 +1,139 @@
 // Two renderers over the same data:
 //  - toSVG(world): headless string output. Agents can "see" a frame as text, diff it, or rasterize it.
 //  - CanvasRenderer: browser, Path2D cached per shape part, zero allocations per frame.
+// Both support: registered shapes, inline entity geometry (e.d), gradient fills,
+// part clipping, and HUD text rendered with the built-in vector stroke font.
+
+import { textPath } from './text.js';
 
 const r = (n) => Math.round(n * 100) / 100;
 
-function partAttrs(p) {
-  return `fill="${p.fill ?? 'none'}" stroke="${p.stroke ?? 'none'}"` +
-    (p.width ? ` stroke-width="${p.width}"` : '') +
-    (p.stroke ? ' stroke-linejoin="round" stroke-linecap="round"' : '');
+const isGrad = (fill) => fill && typeof fill === 'object';
+
+// Gradient/clip defs get stable ids per part across renders.
+const gradIds = new WeakMap();
+const clipIds = new WeakMap();
+let defCounter = 0;
+
+function gradStops(g) {
+  return [...g.stops].sort((a, b) => a[0] - b[0])
+    .map(([off, col]) => `<stop offset="${off}" stop-color="${col}"/>`).join('');
 }
+
+function gradDefXML(fill, id) {
+  if (fill.type === 'radial') {
+    return `<radialGradient id="${id}" gradientUnits="userSpaceOnUse" cx="${fill.cx}" cy="${fill.cy}" r="${fill.r}">${gradStops(fill)}</radialGradient>`;
+  }
+  return `<linearGradient id="${id}" gradientUnits="userSpaceOnUse" x1="${fill.x1}" y1="${fill.y1}" x2="${fill.x2}" y2="${fill.y2}">${gradStops(fill)}</linearGradient>`;
+}
+
+function fillRef(p) {
+  if (!isGrad(p.fill)) return p.fill ?? 'none';
+  let id = gradIds.get(p);
+  if (!id) { id = `g${++defCounter}`; gradIds.set(p, id); }
+  return `url(#${id})`;
+}
+
+function partAttrs(p) {
+  const fill = fillRef(p);
+  let attrs = `fill="${fill}" stroke="${p.stroke ?? 'none'}"`;
+  if (p.width) attrs += ` stroke-width="${p.width}"`;
+  if (p.stroke) attrs += ' stroke-linejoin="round" stroke-linecap="round"';
+  if (isGrad(p.fill)) gradDefs.add(gradDefXML(p.fill, fill.slice(4, -1)));
+  if (p.clip) {
+    let id = clipIds.get(p);
+    if (!id) { id = `c${++defCounter}`; clipIds.set(p, id); }
+    gradDefs.add(`<clipPath id="${id}"><path d="${p.clip}"/></clipPath>`);
+    attrs += ` clip-path="url(#${id})"`;
+  }
+  return attrs;
+}
+
+const gradDefs = new Set(); // defs accumulated during one render pass
+
+const esc = (s) => String(s).replace(/[<>&"]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' })[c]);
+
+/** HUD string -> glyph path group in world units (baseline at 12,24). */
+function hudGroup(hud) {
+  const { parts } = textPath(String(hud), 16);
+  return `<g transform="translate(12 24)" fill="none" stroke="${hudColor}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">` +
+    parts.map((p) => `<path d="${p.d}"/>`).join('') + '</g>';
+}
+
+let hudColor = '#fff';
 
 /** Render the world to a standalone SVG string. */
-export function toSVG(world, { hud = true } = {}) {
+export function toSVG(world, { hud = true, hudFill = '#fff' } = {}) {
+  hudColor = hudFill;
+  gradDefs.clear();
   const defs = Object.entries(world.shapes).map(([name, s]) =>
-    `<g id="${name}">${s.parts.map((p) => `<path d="${p.d}" ${partAttrs(p)}/>`).join('')}</g>`).join('');
-  const uses = world.entities.filter((e) => e.shape && !e.hidden).map((e) =>
-    `<use href="#${e.shape}" data-id="${e.id}" transform="translate(${r(e.x)} ${r(e.y)}) rotate(${r(e.rot * 180 / Math.PI)}) scale(${r(e.scale)})"/>`).join('');
-  const text = hud && world.state.hud
-    ? `<text x="12" y="24" fill="#fff" font-family="monospace" font-size="16">${escapeXML(String(world.state.hud))}</text>` : '';
+    `<g id="${name}">${s.parts.map((p) =>
+      `<path d="${esc(p.d)}" ${partAttrs(p)}/>`).join('')}</g>`).join('');
+  const uses = world.entities.filter((e) => !e.hidden).map((e) => {
+    const t = `translate(${r(e.x)} ${r(e.y)}) rotate(${r(e.rot * 180 / Math.PI)}) scale(${r(e.scale)})`;
+    if (e.d != null) {
+      const p = { d: e.d, fill: e.fill, stroke: e.stroke, width: e.width };
+      return `<path data-id="${e.id}" d="${esc(e.d)}" ${partAttrs(p)} transform="${t}"/>`;
+    }
+    if (!e.shape) return '';
+    return `<use href="#${e.shape}" data-id="${e.id}" transform="${t}"/>`;
+  }).join('');
+  const hudSvg = hud && world.state.hud ? hudGroup(world.state.hud) : '';
+  const extraDefs = gradDefs.size ? [...gradDefs].join('') : '';
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${world.width} ${world.height}" width="${world.width}" height="${world.height}">` +
-    `<rect width="100%" height="100%" fill="${world.background}"/><defs>${defs}</defs>${uses}${text}</svg>`;
+    `<rect width="100%" height="100%" fill="${world.background}"/><defs>${defs}${extraDefs}</defs>${uses}${hudSvg}</svg>`;
 }
-
-function escapeXML(s) { return s.replace(/[<>&"]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' })[c]); }
 
 export class CanvasRenderer {
   constructor(canvas) {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d');
-    this.cache = new WeakMap(); // compiled shape -> Path2D[]
+    this.cache = new WeakMap();   // compiled shape -> { paths: Path2D[], clips: Path2D[] }
+    this.grads = new WeakMap();   // gradient part -> CanvasGradient
+    this.entityPaths = new WeakMap(); // entity -> { d, path }
+    this.hudCache = new Map();    // hud string -> Path2D[]
   }
 
-  paths(shape) {
-    let p = this.cache.get(shape);
-    if (!p) { p = shape.parts.map((part) => new Path2D(part.d)); this.cache.set(shape, p); }
-    return p;
+  compiled(shape) {
+    let c = this.cache.get(shape);
+    if (!c) {
+      c = { paths: shape.parts.map((p) => new Path2D(p.d)), clips: shape.parts.map((p) => p.clip ? new Path2D(p.clip) : null) };
+      this.cache.set(shape, c);
+    }
+    return c;
+  }
+
+  grad(p) {
+    let g = this.grads.get(p);
+    if (!g) {
+      const ctx = this.ctx;
+      if (p.fill.type === 'radial') g = ctx.createRadialGradient(p.fill.cx, p.fill.cy, 0, p.fill.cx, p.fill.cy, p.fill.r);
+      else g = ctx.createLinearGradient(p.fill.x1, p.fill.y1, p.fill.x2, p.fill.y2);
+      for (const [off, col] of [...p.fill.stops].sort((a, b) => a[0] - b[0])) g.addColorStop(off, col);
+      this.grads.set(p, g);
+    }
+    return g;
+  }
+
+  paint(ctx, p, path, clip) {
+    if (clip) { ctx.save(); ctx.clip(clip); }
+    if (p.fill && !isGrad(p.fill) && p.fill !== 'none') { ctx.fillStyle = p.fill; ctx.fill(path); }
+    else if (isGrad(p.fill)) { ctx.fillStyle = this.grad(p); ctx.fill(path); }
+    if (p.stroke && p.stroke !== 'none') {
+      ctx.strokeStyle = p.stroke; ctx.lineWidth = p.width ?? 1;
+      ctx.lineJoin = 'round'; ctx.lineCap = 'round'; ctx.stroke(path);
+    }
+    if (clip) ctx.restore();
+  }
+
+  hud(hud) {
+    let paths = this.hudCache.get(hud);
+    if (!paths) {
+      paths = textPath(hud, 16).parts.map((p) => new Path2D(p.d));
+      if (this.hudCache.size > 64) this.hudCache.clear();
+      this.hudCache.set(hud, paths);
+    }
+    return paths;
   }
 
   draw(world) {
@@ -44,23 +143,26 @@ export class CanvasRenderer {
     ctx.fillStyle = world.background;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     for (const e of world.entities) {
-      const shape = world.shapes[e.shape];
-      if (!shape || e.hidden) continue;
+      if (e.hidden) continue;
       ctx.setTransform(sx, 0, 0, sy, 0, 0);
       ctx.translate(e.x, e.y); ctx.rotate(e.rot); ctx.scale(e.scale, e.scale);
-      const paths = this.paths(shape);
-      shape.parts.forEach((part, i) => {
-        if (part.fill && part.fill !== 'none') { ctx.fillStyle = part.fill; ctx.fill(paths[i]); }
-        if (part.stroke && part.stroke !== 'none') {
-          ctx.strokeStyle = part.stroke; ctx.lineWidth = part.width ?? 1;
-          ctx.lineJoin = 'round'; ctx.lineCap = 'round'; ctx.stroke(paths[i]);
-        }
-      });
+      if (e.d != null) {
+        let rec = this.entityPaths.get(e);
+        if (!rec || rec.d !== e.d) { rec = { d: e.d, path: new Path2D(e.d) }; this.entityPaths.set(e, rec); }
+        this.paint(ctx, { fill: e.fill, stroke: e.stroke, width: e.width }, rec.path, null);
+        continue;
+      }
+      const shape = world.shapes[e.shape];
+      if (!shape) continue;
+      const { paths, clips } = this.compiled(shape);
+      shape.parts.forEach((p, i) => this.paint(ctx, p, paths[i], clips[i]));
     }
     if (world.state.hud) {
       ctx.setTransform(sx, 0, 0, sy, 0, 0);
-      ctx.fillStyle = '#fff'; ctx.font = '16px monospace';
-      ctx.fillText(String(world.state.hud), 12, 24);
+      ctx.translate(12, 24);
+      ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5;
+      ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+      for (const p of this.hud(world.state.hud)) ctx.stroke(p);
     }
   }
 }

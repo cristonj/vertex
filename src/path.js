@@ -1,5 +1,6 @@
 // SVG path data parser + flattener. Zero dependencies.
-// Supports: M L H V C S Q T Z (absolute + relative). Arcs (A) are approximated as lines for now.
+// Supports: M L H V C S Q T A Z (absolute + relative). Arcs are converted to
+// sampled line segments at parse time (endpoint -> center parameterization).
 
 const CMD = /[MmLlHhVvCcSsQqTtAaZz]/;
 const TOKEN = /[MmLlHhVvCcSsQqTtAaZz]|-?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?/g;
@@ -55,8 +56,14 @@ export function parsePath(d) {
         const c = [rx, ry, a[0] + ox, a[1] + oy];
         out.push(['Q', ...c]); lastCtrl = ['Q', rx, ry]; x = c[2]; y = c[3]; break;
       }
-      case 'A': // TODO: true arc flattening
-        x = a[5] + ox; y = a[6] + oy; out.push(['L', x, y]); lastCtrl = null; break;
+      case 'A': {
+        // True arc flattening (W3C endpoint -> center conversion), sampled as lines.
+        const [rrx0, rry0, rotDeg, fA, fS, ea, eb] = a;
+        const ex = ea + ox, ey = eb + oy;
+        if (!rrx0 || !rry0 || (ex === x && ey === y)) { out.push(['L', ex, ey]); }
+        else for (const p of sampleArc(x, y, rrx0, rry0, rotDeg, fA, fS, ex, ey)) out.push(['L', p[0], p[1]]);
+        x = ex; y = ey; lastCtrl = null; break;
+      }
     }
   }
   return out;
@@ -104,4 +111,44 @@ export function bounds(polys) {
     const d = x * x + y * y; if (d > r2) r2 = d;
   }
   return { minX, minY, maxX, maxY, radius: Math.sqrt(r2) };
+}
+
+/** W3C SVG endpoint->center arc conversion, sampled into points (excluding the start point). */
+function sampleArc(x1, y1, rx, ry, rotDeg, fA, fS, x2, y2) {
+  const phi = rotDeg * Math.PI / 180;
+  const cosP = Math.cos(phi), sinP = Math.sin(phi);
+  const dx = (x1 - x2) / 2, dy = (y1 - y2) / 2;
+  const x1p = cosP * dx + sinP * dy;
+  const y1p = -sinP * dx + cosP * dy;
+  let rrx = Math.abs(rx), rry = Math.abs(ry);
+  const lambda = (x1p * x1p) / (rrx * rrx) + (y1p * y1p) / (rry * rry);
+  if (lambda > 1) { const s = Math.sqrt(lambda); rrx *= s; rry *= s; } // scale radii up if too small
+  const num = rrx * rrx * rry * rry - rrx * rrx * y1p * y1p - rry * rry * x1p * x1p;
+  const den = rrx * rrx * y1p * y1p + rry * rry * x1p * x1p;
+  let co = den ? Math.sqrt(Math.max(0, num / den)) : 0;
+  if (fA === fS) co = -co;
+  const cxp = co * rrx * y1p / rry, cyp = -co * rry * x1p / rrx;
+  const cx = cosP * cxp - sinP * cyp + (x1 + x2) / 2;
+  const cy = sinP * cxp + cosP * cyp + (y1 + y2) / 2;
+  const angle = (ux, uy, vx, vy) => {
+    const dot = ux * vx + uy * vy;
+    const len = Math.hypot(ux, uy) * Math.hypot(vx, vy) || 1;
+    let a = Math.acos(Math.max(-1, Math.min(1, dot / len)));
+    if (ux * vy - uy * vx < 0) a = -a;
+    return a;
+  };
+  const u1x = (x1p - cxp) / rrx, u1y = (y1p - cyp) / rry;
+  const u2x = (-x1p - cxp) / rrx, u2y = (-y1p - cyp) / rry;
+  const theta1 = angle(1, 0, u1x, u1y);
+  let dtheta = angle(u1x, u1y, u2x, u2y);
+  if (!fS && dtheta > 0) dtheta -= 2 * Math.PI;
+  if (fS && dtheta < 0) dtheta += 2 * Math.PI;
+  const steps = Math.max(4, Math.ceil(Math.abs(dtheta) / (Math.PI / 12)));
+  const pts = [];
+  for (let i = 1; i <= steps; i++) {
+    const t = theta1 + (dtheta * i) / steps;
+    const px = rrx * Math.cos(t), py = rry * Math.sin(t);
+    pts.push([cosP * px - sinP * py + cx, sinP * px + cosP * py + cy]);
+  }
+  return pts;
 }

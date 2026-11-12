@@ -47,18 +47,25 @@ function checkShape(s, path, err) {
   } else if (!isStr(s.d) || !s.d.trim()) {
     err(`${path}.d`, 'must be a non-empty SVG path string (or provide parts)');
   }
-  for (const k of ['fill', 'stroke']) if (s[k] !== undefined && !isStr(s[k])) err(`${path}.${k}`, 'must be a CSS color string');
+  if (s.fill !== undefined && !isStr(s.fill)) {
+    if (typeof s.fill !== 'object' || s.fill === null || Array.isArray(s.fill)) err(`${path}.fill`, 'must be a CSS color string or a gradient object {type, stops}');
+    else if (!Array.isArray(s.fill.stops)) err(`${path}.fill.stops`, 'gradient stops must be an array of [offset, color]');
+  }
+  for (const k of ['stroke']) if (s[k] !== undefined && !isStr(s[k])) err(`${path}.${k}`, 'must be a CSS color string');
   if (s.width !== undefined && !isNum(s.width)) err(`${path}.width`, 'must be a number');
+  if (s.clip !== undefined && !isStr(s.clip)) err(`${path}.clip`, 'must be an SVG path string');
 }
 
 function checkEntity(e, path, names, err) {
   if (!e || typeof e !== 'object' || Array.isArray(e)) { err(path, 'entity must be an object'); return; }
   if (e.id !== undefined && !isStr(e.id)) err(`${path}.id`, 'must be a string');
+  if (e.d !== undefined && (!isStr(e.d) || !e.d.trim())) err(`${path}.d`, 'must be a non-empty SVG path string');
   if (e.shape !== undefined) {
     if (!isStr(e.shape)) err(`${path}.shape`, 'must be a string');
-    else if (names.size && !names.has(e.shape)) err(`${path}.shape`, `unknown shape "${e.shape}"`);
+    else if (e.d === undefined && names.size && !names.has(e.shape)) err(`${path}.shape`, `unknown shape "${e.shape}"`);
   }
   for (const k of ENTITY_NUMS) if (e[k] !== undefined && !isNum(e[k])) err(`${path}.${k}`, 'must be a number');
+  for (const k of ['fill', 'stroke']) if (e[k] !== undefined && !isStr(e[k])) err(`${path}.${k}`, 'must be a CSS color string');
   if (e.tags !== undefined && !(Array.isArray(e.tags) && e.tags.every(isStr))) err(`${path}.tags`, 'must be an array of strings');
   if (e.data !== undefined && (typeof e.data !== 'object' || e.data === null || Array.isArray(e.data))) err(`${path}.data`, 'must be an object');
 }

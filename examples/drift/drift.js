@@ -1,5 +1,5 @@
 // Drift: a tiny vector space-shooter. Pure logic — runs in browser or headless.
-import { Game, systems } from '../../src/index.js';
+import { Game, systems, collideOutline } from '../../src/index.js';
 
 export const scene = {
   width: 800, height: 600, background: '#0b0d12',
@@ -43,7 +43,7 @@ export function createGame(opts) {
     .use(systems.motion)
     .use(systems.wrap)
     .use(systems.lifetime)
-    .use(systems.collide([['bullet', 'rock'], ['ship', 'rock']]))
+    .use(collideOutline([['bullet', 'rock'], ['ship', 'rock']])) // exact: the art is the hitbox
     .use((g) => { // resolve hits
       const dead = new Set();
       for (const ev of g.events) {

@@ -1,5 +1,5 @@
 export { parsePath, flatten, bounds } from './path.js';
-export { World } from './world.js';
+export { World, entityGeom } from './world.js';
 export { Game } from './engine.js';
 export { toSVG, CanvasRenderer } from './render.js';
 export * as systems from './systems.js';
@@ -8,3 +8,7 @@ export { checkScene, assertValidScene } from './validate.js';
 export { Recorder, applyRecording, verifyReplay, digest } from './replay.js';
 export { toPNG, parseColor, encodePNG } from './png.js';
 export { loadSceneModule, createFrom } from './load.js';
+export { collideOutline, outlinesOverlap, pointInPoly, entityPolys, outlinesTouch } from './collision.js';
+export { textPath, textShape, textWidth } from './text.js';
+export * as animate from './animate.js';
+export * as procedural from './procedural.js';

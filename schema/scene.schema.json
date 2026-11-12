@@ -28,10 +28,14 @@
       "type": "object",
       "description": "One path with style, or a composite of parts.",
       "properties": {
-        "d": { "type": "string", "description": "SVG path data. Supports M/L/H/V/C/S/Q/T/Z, absolute and relative. Arcs (A) are approximated as lines." },
-        "fill": { "type": "string", "description": "CSS color, or 'none'." },
+        "d": { "type": "string", "description": "SVG path data. Supports M/L/H/V/C/S/Q/T/A/Z, absolute and relative." },
+        "fill": {
+          "description": "CSS color, 'none', or a gradient.",
+          "anyOf": [ { "type": "string" }, { "$ref": "#/definitions/gradient" } ]
+        },
         "stroke": { "type": "string", "description": "CSS color, or 'none'." },
         "width": { "type": "number", "description": "Stroke width." },
+        "clip": { "type": "string", "description": "SVG path data; the part is clipped to this region (local coords)." },
         "parts": {
           "type": "array",
           "description": "Multiple paths drawn together as one shape, in order.",
@@ -40,12 +44,31 @@
       },
       "anyOf": [ { "required": ["d"] }, { "required": ["parts"] } ]
     },
+    "gradient": {
+      "type": "object",
+      "description": "Linear (x1,y1 -> x2,y2) or radial (cx,cy,r) gradient in local shape coordinates.",
+      "required": ["type", "stops"],
+      "properties": {
+        "type": { "enum": ["linear", "radial"] },
+        "x1": { "type": "number" }, "y1": { "type": "number" }, "x2": { "type": "number" }, "y2": { "type": "number" },
+        "cx": { "type": "number" }, "cy": { "type": "number" }, "r": { "type": "number" },
+        "stops": {
+          "type": "array",
+          "items": { "type": "array", "prefixItems": [ { "type": "number" }, { "type": "string" } ], "minItems": 2, "maxItems": 2 },
+          "description": "[[offset 0..1, color], ...]"
+        }
+      }
+    },
     "entity": {
       "type": "object",
       "description": "An instance of a shape in the world.",
       "properties": {
         "id": { "type": "string", "description": "Unique id. Auto-assigned (e1, e2, ...) if omitted." },
         "shape": { "type": "string", "description": "Name of a shape defined in shapes." },
+        "d": { "type": "string", "description": "Inline geometry (SVG path data) instead of a named shape; may change every step (morphs, generated art)." },
+        "fill": { "type": "string", "description": "Fill for inline geometry." },
+        "stroke": { "type": "string", "description": "Stroke for inline geometry." },
+        "width": { "type": "number", "description": "Stroke width for inline geometry." },
         "x": { "type": "number" },
         "y": { "type": "number" },
         "rot": { "type": "number", "description": "Rotation in radians; 0 faces +x." },

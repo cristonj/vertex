@@ -1,8 +1,10 @@
 // Pure-JS vector rasterizer: world -> PNG. Zero dependencies (node:zlib only).
-// Fills polygons (even-odd scanline) and strokes (thick quads + round joins) with flat color,
-// using the same coordinates as toSVG. HUD text is not rasterized (agents use the SVG for that).
+// Fills polygons (even-odd scanline) and strokes (thick quads + round joins) with flat color
+// or gradients, using the same coordinates as toSVG. Renders registered shapes, inline
+// entity geometry (e.d), gradient fills, and HUD text via the built-in vector stroke font.
 import { deflateSync } from 'node:zlib';
-import { flatten } from './path.js';
+import { flatten, parsePath } from './path.js';
+import { textPath } from './text.js';
 
 const NAMED = {
   black: '#000000', white: '#ffffff', red: '#ff0000', green: '#008000', blue: '#0000ff',
@@ -30,6 +32,21 @@ export function parseColor(s) {
   return null;
 }
 
+/** Color ramp through gradient stops, as [r,g,b]. */
+function ramp(stops, t) {
+  const s = [...stops].sort((a, b) => a[0] - b[0]);
+  if (t <= s[0][0]) return parseColor(s[0][1]);
+  if (t >= s[s.length - 1][0]) return parseColor(s[s.length - 1][1]);
+  for (let i = 1; i < s.length; i++) {
+    if (t <= s[i][0]) {
+      const f = (t - s[i - 1][0]) / (s[i][0] - s[i - 1][0] || 1);
+      const a = parseColor(s[i - 1][1]), b = parseColor(s[i][1]);
+      return a.map((v, j) => Math.round(v + (b[j] - v) * f));
+    }
+  }
+  return parseColor(s[s.length - 1][1]);
+}
+
 /**
  * Render a world to a PNG buffer. Default size = world size (1 world unit = 1 pixel);
  * pass width/height to render at any other resolution — vectors stay crisp.
@@ -43,18 +60,33 @@ export function toPNG(world, { width = world.width, height = world.height } = {}
 
   const sx = width / world.width, sy = height / world.height;
   for (const e of world.entities) {
-    const shape = world.shapes[e.shape];
-    if (!shape || e.hidden) continue;
+    if (e.hidden) continue;
+    const parts = e.d != null
+      ? [{ cmds: parsePath(e.d), fill: e.fill, stroke: e.stroke, width: e.width }]
+      : world.shapes[e.shape]?.parts;
+    if (!parts) continue;
     const cos = Math.cos(e.rot), sin = Math.sin(e.rot);
     const T = (x, y) => [
       (e.x + (x * cos - y * sin) * e.scale) * sx,
       (e.y + (x * sin + y * cos) * e.scale) * sy,
     ];
-    for (const part of shape.parts) {
+    // pixel -> shape-local, for gradient evaluation
+    const inv = (pX, pY) => {
+      const dx = pX / sx - e.x, dy = pY / sy - e.y;
+      return [(dx * cos + dy * sin) / e.scale, (-dx * sin + dy * cos) / e.scale];
+    };
+    const gradAt = (fill) => {
+      if (fill.type === 'radial') return (pX, pY) => { const [lx, ly] = inv(pX, pY); return ramp(fill.stops, Math.hypot(lx - fill.cx, ly - fill.cy) / fill.r); };
+      const vx = fill.x2 - fill.x1, vy = fill.y2 - fill.y1, v2 = vx * vx + vy * vy || 1;
+      return (pX, pY) => { const [lx, ly] = inv(pX, pY); return ramp(fill.stops, ((lx - fill.x1) * vx + (ly - fill.y1) * vy) / v2); };
+    };
+    for (const part of parts) {
       const polys = part.polys ?? flatten(part.cmds);
       const paths = polys.map((p) => p.map(([x, y]) => T(x, y)));
-      const fill = parseColor(part.fill);
-      if (fill) fillPolys(px, width, height, paths, fill);
+      if (part.fill) {
+        const colorAt = typeof part.fill === 'object' ? gradAt(part.fill) : null;
+        if (colorAt || parseColor(part.fill)) fillPolys(px, width, height, paths, colorAt ?? parseColor(part.fill));
+      }
       const stroke = parseColor(part.stroke);
       if (stroke) {
         const w = (part.width ?? 1) * e.scale * ((sx + sy) / 2);
@@ -62,11 +94,23 @@ export function toPNG(world, { width = world.width, height = world.height } = {}
       }
     }
   }
+
+  // HUD as vector glyphs (baseline at world 12,24, size 16)
+  if (world.state.hud) {
+    const T = (x, y) => [(12 + x) * sx, (24 + y) * sy];
+    const color = parseColor(world.state.hudColor) ?? [255, 255, 255];
+    for (const p of textPath(String(world.state.hud), 16).parts) {
+      const paths = flatten(parsePath(p.d)).map((poly) => poly.map(([x, y]) => T(x, y)));
+      for (const poly of strokePolys(paths, 1.5 * ((sx + sy) / 2))) fillPolys(px, width, height, [poly], color);
+    }
+  }
+
   return encodePNG(px, width, height);
 }
 
-/** Even-odd scanline fill of one or more subpaths (shared edges => holes work). */
-function fillPolys(px, W, H, paths, [r, g, b]) {
+/** Even-odd scanline fill of one or more subpaths. `color` is [r,g,b] or colorAt(px,py). */
+function fillPolys(px, W, H, paths, color) {
+  const fn = typeof color === 'function' ? color : null;
   let minY = Infinity, maxY = -Infinity;
   const edges = [];
   for (const p of paths) {
@@ -93,6 +137,7 @@ function fillPolys(px, W, H, paths, [r, g, b]) {
       const xa = Math.max(0, Math.ceil(xs[k] - 0.5));
       const xb = Math.min(W - 1, Math.ceil(xs[k + 1] - 0.5) - 1);
       for (let x = xa; x <= xb; x++) {
+        const [r, g, b] = fn ? fn(x, y) : color;
         const i = (y * W + x) * 3;
         px[i] = r; px[i + 1] = g; px[i + 2] = b;
       }
